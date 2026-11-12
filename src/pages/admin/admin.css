@@ -1,0 +1,50 @@
+/* OWNER: Agent F — 管理员后台专属样式 */
+.admin-users { min-width: 0; }
+
+.admin-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.admin-stat { padding: 16px; }
+.admin-stat-label { font-size: 0.85rem; }
+.admin-stat-value { font-size: 1.6rem; font-weight: 600; line-height: 1.2; }
+
+.admin-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+  margin-bottom: 16px;
+}
+.admin-search { flex: 1 1 240px; min-width: 0; }
+
+.admin-alert { margin-bottom: 16px; }
+
+/* 表格卡片：卡片本身不溢出，内部 .table-wrap 横向卷动 */
+.admin-table-card { padding: 0; overflow: hidden; max-width: 100%; }
+.admin-table-card .table-wrap { -webkit-overflow-scrolling: touch; }
+.admin-count { padding: 8px 12px; font-size: 0.85rem; }
+
+.admin-user-cell { display: flex; align-items: center; gap: 8px; }
+.admin-avatar-fallback {
+  display: inline-grid; place-items: center; flex-shrink: 0;
+  font-size: 0.85rem; font-weight: 600; color: var(--muted);
+}
+.admin-badges { display: flex; gap: 4px; flex-wrap: nowrap; }
+.admin-badge-active { color: var(--success); border-color: var(--success); }
+.admin-row-disabled td { color: var(--muted); }
+
+.admin-actions { display: flex; align-items: center; gap: 8px; }
+.admin-role-select {
+  padding: 4px 8px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--text); font: inherit; font-size: 0.875rem;
+}
+.admin-role-select:disabled { opacity: 0.55; cursor: not-allowed; }
+
+@media (max-width: 560px) {
+  .admin-stats { gap: 8px; }
+  .admin-stat { padding: 10px; }
+  .admin-stat-value { font-size: 1.25rem; }
+}

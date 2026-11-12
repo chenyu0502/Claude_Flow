@@ -1,0 +1,59 @@
+/* OWNER: Agent D — 登录/注册/重设密码页专属样式 */
+.auth-page {
+  min-height: calc(100vh - 140px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.auth-card h1 {
+  font-size: 1.5rem;
+  text-align: center;
+}
+.auth-subtitle {
+  text-align: center;
+  color: var(--muted);
+  margin: -0.25rem 0 1.25rem;
+  font-size: 0.925rem;
+}
+.auth-alerts:not(:empty) {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.alert-info {
+  background: color-mix(in srgb, var(--primary) 12%, var(--surface));
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--primary) 35%, transparent);
+}
+.field-error {
+  color: var(--danger);
+  font-size: 0.8rem;
+}
+.field input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+.auth-forgot {
+  align-self: flex-end;
+  font-size: 0.875rem;
+  margin-top: -4px;
+}
+.auth-footer {
+  text-align: center;
+  margin-top: 20px;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.oauth-icon {
+  flex-shrink: 0;
+}
+
+@media (max-width: 480px) {
+  .auth-page {
+    min-height: auto;
+    padding-top: 12px;
+  }
+  .auth-card {
+    padding: 20px 16px;
+  }
+}

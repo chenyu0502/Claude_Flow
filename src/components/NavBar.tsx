@@ -1,0 +1,88 @@
+// OWNER: Agent E
+import { useState } from 'react';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { useAuth } from '../auth/AuthContext';
+import './navbar.css';
+
+interface AvatarProps {
+  name: string | null | undefined;
+  photoURL: string | null | undefined;
+  large?: boolean;
+}
+
+/** 头像：有 photoURL 显示图片（载入失败退回首字母），否则显示首字母圆形 */
+export function Avatar({ name, photoURL, large }: AvatarProps) {
+  const [broken, setBroken] = useState(false);
+  const cls = large ? 'avatar avatar-lg' : 'avatar';
+  if (photoURL && !broken) {
+    return <img className={cls} src={photoURL} alt="" referrerPolicy="no-referrer" onError={() => setBroken(true)} />;
+  }
+  const initial = (name?.trim()?.[0] ?? '?').toUpperCase();
+  return (
+    <span className={`${cls} avatar-initial`} aria-hidden="true">
+      {initial}
+    </span>
+  );
+}
+
+const navClass = ({ isActive }: { isActive: boolean }) => (isActive ? 'nav-link active' : 'nav-link');
+
+export default function NavBar() {
+  const { user, profile, loading, isAdmin, signOut } = useAuth();
+  const navigate = useNavigate();
+  const [signingOut, setSigningOut] = useState(false);
+
+  // profile 存在时以 Firestore 为准（用户可能刻意清空头像），否则退回 Auth 资料
+  const name = (profile ? profile.displayName : user?.displayName) || user?.email || '用户';
+  const photoURL = profile ? profile.photoURL : (user?.photoURL ?? null);
+
+  async function handleSignOut() {
+    setSigningOut(true);
+    try {
+      await signOut();
+      navigate('/login');
+    } finally {
+      setSigningOut(false);
+    }
+  }
+
+  return (
+    <header className="navbar">
+      <div className="navbar-inner">
+        <Link to="/" className="navbar-brand">
+          Claude Flow
+        </Link>
+        <nav className="navbar-right" aria-label="主导航">
+          {loading ? null : user ? (
+            <>
+              <span className="navbar-user" title={name}>
+                <Avatar name={name} photoURL={photoURL} />
+                <span className="navbar-name">{name}</span>
+              </span>
+              <NavLink to="/profile" className={navClass}>
+                个人资料
+              </NavLink>
+              {isAdmin && (
+                <NavLink to="/admin/users" className={navClass}>
+                  用户管理
+                </NavLink>
+              )}
+              <button type="button" className="btn btn-sm" onClick={handleSignOut} disabled={signingOut}>
+                登出
+              </button>
+            </>
+          ) : (
+            <>
+              <Link to="/login" className="btn btn-sm">
+                登录
+              </Link>
+              <Link to="/register" className="btn btn-sm btn-primary">
+                注册
+              </Link>
+            </>
+          )}
+        </nav>
+      </div>
+    </header>
+  );
+}

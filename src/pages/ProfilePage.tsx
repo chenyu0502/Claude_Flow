@@ -1,0 +1,225 @@
+// OWNER: Agent E
+import { useEffect, useState, type FormEvent } from 'react';
+import type { Timestamp } from 'firebase/firestore';
+import { useAuth } from '../auth/AuthContext';
+import { Avatar } from '../components/NavBar';
+import { auth } from '../lib/firebase';
+import { authErrorMessage, isUserCancelled, linkProvider, unlinkProvider } from '../services/auth';
+import { ensureUserProfile, updateOwnProfile } from '../services/users';
+import { PROVIDER_LABELS, SUPPORTED_PROVIDERS, type ProviderId } from '../types/user';
+import './profile.css';
+
+export const DISPLAY_NAME_MAX = 50;
+
+export function formatTimestamp(ts: Timestamp | null | undefined): string {
+  if (!ts) return '—';
+  try {
+    return ts.toDate().toLocaleString('zh-CN');
+  } catch {
+    return '—';
+  }
+}
+
+/** 返回错误讯息；通过时返回 null */
+export function validateProfile(displayName: string, photoURL: string): string | null {
+  const name = displayName.trim();
+  if (!name) return '显示名称不能为空';
+  if (name.length > DISPLAY_NAME_MAX) return `显示名称不能超过 ${DISPLAY_NAME_MAX} 个字`;
+  const url = photoURL.trim();
+  if (url && !url.startsWith('https://')) return '头像网址必须以 https:// 开头';
+  return null;
+}
+
+type Msg = { kind: 'success' | 'error'; text: string } | null;
+
+function linkedProviders(providerData: { providerId: string }[] | undefined): ProviderId[] {
+  const ids = (providerData ?? []).map((p) => p.providerId);
+  return SUPPORTED_PROVIDERS.filter((id) => ids.includes(id));
+}
+
+export default function ProfilePage() {
+  const { user, profile, isAdmin } = useAuth();
+
+  const [displayName, setDisplayName] = useState('');
+  const [photoURL, setPhotoURL] = useState('');
+  const [initialized, setInitialized] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<Msg>(null);
+
+  // providers 以 Firebase Auth 的 providerData 为准；link/unlink 后 user 对象引用不变，所以另存一份触发重绘
+  const [linked, setLinked] = useState<ProviderId[]>(() => linkedProviders(user?.providerData));
+  const [busyProvider, setBusyProvider] = useState<ProviderId | null>(null);
+  const [providerMsg, setProviderMsg] = useState<Msg>(null);
+
+  useEffect(() => {
+    setLinked(linkedProviders(user?.providerData));
+  }, [user]);
+
+  // profile 首次到达时填入表单（之后不覆盖用户正在编辑的内容）
+  useEffect(() => {
+    if (initialized || !profile) return;
+    setDisplayName(profile.displayName ?? '');
+    setPhotoURL(profile.photoURL ?? '');
+    setInitialized(true);
+  }, [profile, initialized]);
+
+  if (!user) return null; // RequireAuth 已把关
+  if (!profile) return <div className="spinner-page">载入中…</div>;
+
+  const uid = user.uid;
+
+  async function handleSave(e: FormEvent) {
+    e.preventDefault();
+    setSaveMsg(null);
+    const err = validateProfile(displayName, photoURL);
+    if (err) {
+      setSaveMsg({ kind: 'error', text: err });
+      return;
+    }
+    setSaving(true);
+    try {
+      const url = photoURL.trim();
+      await updateOwnProfile(uid, { displayName: displayName.trim(), photoURL: url || null });
+      setSaveMsg({ kind: 'success', text: '已保存' });
+    } catch (saveErr) {
+      setSaveMsg({ kind: 'error', text: authErrorMessage(saveErr) });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function syncAfterProviderChange() {
+    const current = auth.currentUser ?? user;
+    if (!current) return;
+    await current.reload();
+    const fresh = auth.currentUser ?? current;
+    setLinked(linkedProviders(fresh.providerData));
+    await ensureUserProfile(fresh);
+  }
+
+  async function runProviderAction(id: ProviderId, action: () => Promise<unknown>, okText: string) {
+    setProviderMsg(null);
+    setBusyProvider(id);
+    try {
+      await action();
+      await syncAfterProviderChange();
+      setProviderMsg({ kind: 'success', text: okText });
+    } catch (err) {
+      if (!isUserCancelled(err)) setProviderMsg({ kind: 'error', text: authErrorMessage(err) });
+    } finally {
+      setBusyProvider(null);
+    }
+  }
+
+  const handleLink = (id: Exclude<ProviderId, 'password'>) =>
+    runProviderAction(id, () => linkProvider(id), `已绑定 ${PROVIDER_LABELS[id]}`);
+  const handleUnlink = (id: ProviderId) =>
+    runProviderAction(id, () => unlinkProvider(id), `已解除 ${PROVIDER_LABELS[id]}`);
+
+  const onlyOne = linked.length <= 1;
+  const headerName = profile.displayName || profile.email || user.email;
+
+  return (
+    <div className="container profile-page stack">
+      <section className="card stack">
+        <div className="profile-header">
+          <Avatar name={headerName} photoURL={profile.photoURL} large />
+          <div className="profile-header-info">
+            <h1>{profile.displayName || '未命名用户'}</h1>
+            <div className="row">
+              <span className="muted profile-email">{profile.email ?? user.email ?? '—'}</span>
+              <span className={isAdmin ? 'badge badge-admin' : 'badge'}>{isAdmin ? '管理员' : '一般用户'}</span>
+              {profile.disabled && <span className="badge badge-danger">已停用</span>}
+            </div>
+          </div>
+        </div>
+        <dl className="profile-meta">
+          <dt>建立时间</dt>
+          <dd>{formatTimestamp(profile.createdAt)}</dd>
+          <dt>最后登录</dt>
+          <dd>{formatTimestamp(profile.lastLoginAt)}</dd>
+        </dl>
+      </section>
+
+      <section className="card">
+        <h2>编辑资料</h2>
+        <form className="stack" onSubmit={handleSave} noValidate>
+          <div className="field">
+            <label htmlFor="displayName">显示名称</label>
+            <input id="displayName" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+            <span className="field-hint">
+              {displayName.trim().length}/{DISPLAY_NAME_MAX}
+            </span>
+          </div>
+          <div className="field">
+            <label htmlFor="photoURL">头像网址</label>
+            <input
+              id="photoURL"
+              type="url"
+              placeholder="https://…（留空则显示首字母）"
+              value={photoURL}
+              onChange={(e) => setPhotoURL(e.target.value)}
+            />
+          </div>
+          {saveMsg && (
+            <div className={`alert alert-${saveMsg.kind}`} role={saveMsg.kind === 'error' ? 'alert' : 'status'}>
+              {saveMsg.text}
+            </div>
+          )}
+          <div className="row">
+            <button type="submit" className="btn btn-primary" disabled={saving}>
+              {saving ? '保存中…' : '保存'}
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section className="card stack">
+        <h2>登录方式</h2>
+        <ul className="provider-list">
+          {SUPPORTED_PROVIDERS.map((id) => {
+            const isLinked = linked.includes(id);
+            return (
+              <li key={id} className="provider-item" data-testid={`provider-${id}`}>
+                <span className="provider-name">{PROVIDER_LABELS[id]}</span>
+                <span className="row">
+                  {isLinked ? (
+                    <>
+                      <span className="badge">已绑定</span>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-danger"
+                        disabled={onlyOne || busyProvider !== null}
+                        title={onlyOne ? '至少需要保留一种登录方式' : undefined}
+                        onClick={() => handleUnlink(id)}
+                      >
+                        解除
+                      </button>
+                    </>
+                  ) : id === 'password' ? (
+                    <span className="muted">未设置</span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      disabled={busyProvider !== null}
+                      onClick={() => handleLink(id)}
+                    >
+                      绑定
+                    </button>
+                  )}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+        {onlyOne && <p className="field-hint">只剩一种登录方式，无法解除；请先绑定其他登录方式。</p>}
+        {providerMsg && (
+          <div className={`alert alert-${providerMsg.kind}`} role={providerMsg.kind === 'error' ? 'alert' : 'status'}>
+            {providerMsg.text}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}

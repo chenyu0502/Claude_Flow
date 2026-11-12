@@ -1,0 +1,106 @@
+rules_version = '2';
+
+// Firestore Security Rules（规格见 CONTRACTS.md「Security Rules 规格」）
+// 只开放 users/{uid}，其他集合一律拒绝。
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userPath(uid) {
+      return /databases/$(database)/documents/users/$(uid);
+    }
+
+    // admin = 自己的文档 role == 'admin' 且 disabled == false
+    function isAdmin() {
+      return signedIn()
+        && exists(userPath(request.auth.uid))
+        && get(userPath(request.auth.uid)).data.get('role', 'user') == 'admin'
+        && get(userPath(request.auth.uid)).data.get('disabled', true) == false;
+    }
+
+    // UserProfile 的全部字段键
+    function profileKeys() {
+      return ['uid', 'email', 'displayName', 'photoURL', 'role', 'disabled',
+              'providers', 'createdAt', 'lastLoginAt'];
+    }
+
+    // 本人可改的字段
+    function selfEditableKeys() {
+      return ['displayName', 'photoURL', 'email', 'providers', 'lastLoginAt'];
+    }
+
+    function validDisplayName(v) {
+      return v == null || (v is string && v.size() <= 50);
+    }
+
+    function validPhotoURL(v) {
+      return v == null || (v is string && v.size() <= 2048);
+    }
+
+    function validEmail(v) {
+      return v == null || (v is string && v.size() <= 320);
+    }
+
+    function validProviders(v) {
+      return v is list && v.size() <= 3 && v.hasOnly(['google.com', 'github.com', 'password']);
+    }
+
+    // 本人可改字段的值检查（对写入后的完整文档检查）
+    function validEditableValues(data) {
+      return validDisplayName(data.displayName)
+        && validPhotoURL(data.photoURL)
+        && validEmail(data.email)
+        && validProviders(data.providers);
+    }
+
+    function validCreate(userId) {
+      let data = request.resource.data;
+      return request.auth.uid == userId
+        && data.keys().hasOnly(profileKeys())
+        && data.keys().hasAll(profileKeys())
+        && data.uid == userId
+        && data.role == 'user'
+        && data.disabled == false
+        && validEditableValues(data)
+        && data.createdAt == request.time
+        && data.lastLoginAt == request.time;
+    }
+
+    // 本人更新：未停用；只能动 selfEditableKeys；lastLoginAt 若改动必须是 serverTimestamp()
+    function validSelfUpdate(userId) {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      return request.auth.uid == userId
+        && resource.data.disabled == false
+        && changed.hasOnly(selfEditableKeys())
+        && validEditableValues(request.resource.data)
+        && (!changed.hasAny(['lastLoginAt']) || request.resource.data.lastLoginAt == request.time);
+    }
+
+    // admin 更新他人：只能动 role / disabled；不能改自己（自己走 validSelfUpdate，那里不允许动 role/disabled）
+    function validAdminUpdate(userId) {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      return request.auth.uid != userId
+        && isAdmin()
+        && changed.hasOnly(['role', 'disabled'])
+        && request.resource.data.role in ['admin', 'user']
+        && request.resource.data.disabled is bool;
+    }
+
+    match /users/{userId} {
+      // 本人可读自己（即使 disabled）；admin 可读全部
+      allow get: if signedIn() && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
+      allow create: if signedIn() && validCreate(userId);
+      allow update: if signedIn() && (validSelfUpdate(userId) || validAdminUpdate(userId));
+      allow delete: if false;
+    }
+
+    // 其他集合：全部拒绝（未匹配的路径默认即拒绝，这里显式写出）
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
