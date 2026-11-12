@@ -100,6 +100,9 @@ export default function AdminUsersPage() {
     [users],
   );
 
+  // 載入中或讀取失敗時 users 是空陣列，直接顯示 0 會被誤認為「真的沒有使用者」。
+  const statValue = (n: number) => (loading || loadError ? '—' : n);
+
   const visible = useMemo(() => users.filter((u) => matchesFilter(u, filter, query)), [users, filter, query]);
 
   async function runAction(uid: string, action: () => Promise<void>) {
@@ -140,15 +143,15 @@ export default function AdminUsersPage() {
       <div className="admin-stats">
         <div className="card admin-stat">
           <div className="admin-stat-label muted">總人數</div>
-          <div className="admin-stat-value" data-testid="stat-total">{stats.total}</div>
+          <div className="admin-stat-value" data-testid="stat-total">{statValue(stats.total)}</div>
         </div>
         <div className="card admin-stat">
           <div className="admin-stat-label muted">管理員</div>
-          <div className="admin-stat-value" data-testid="stat-admins">{stats.admins}</div>
+          <div className="admin-stat-value" data-testid="stat-admins">{statValue(stats.admins)}</div>
         </div>
         <div className="card admin-stat">
           <div className="admin-stat-label muted">已停用</div>
-          <div className="admin-stat-value" data-testid="stat-disabled">{stats.disabled}</div>
+          <div className="admin-stat-value" data-testid="stat-disabled">{statValue(stats.disabled)}</div>
         </div>
       </div>
 

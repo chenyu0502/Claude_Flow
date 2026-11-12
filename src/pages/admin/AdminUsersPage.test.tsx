@@ -114,6 +114,10 @@ describe('AdminUsersPage', () => {
     mocks.subscribeAllUsers.mockImplementation(() => mocks.unsubscribe);
     render(<AdminUsersPage />);
     expect(screen.getByText('載入中…')).toBeInTheDocument();
+    // 統計數字不能先顯示 0，會被誤認為沒有使用者
+    expect(screen.getByTestId('stat-total')).toHaveTextContent('—');
+    expect(screen.getByTestId('stat-admins')).toHaveTextContent('—');
+    expect(screen.getByTestId('stat-disabled')).toHaveTextContent('—');
   });
 
   it('空列表狀態', () => {
