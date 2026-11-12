@@ -140,15 +140,32 @@ export async function updateOwnProfile(uid: string, fields: Partial<EditableProf
   await updateDoc(userRef(uid), patch);
 }
 
-/** 僅 admin 可用（由 Security Rules 把關），按 createdAt 新到舊 */
+/**
+ * 僅 admin 可用（由 Security Rules 把關），按 createdAt 新到舊。
+ *
+ * 第一份資料一定等伺服器回應才交出去：Firestore 會先用本機快取回一次結果，
+ * 而快取裡通常只有管理員自己的文件（AuthContext 訂閱過），管理頁會短暫顯示
+ * 「總人數 1」，看起來像其他帳號不見了。收過一次伺服器資料之後，快取快照
+ * （例如離線時）照常交出，維持即時更新。
+ *
+ * 代價：完全離線時開啟管理頁會一直停在載入中，直到恢復連線。
+ */
 export function subscribeAllUsers(
   onData: (users: UserProfile[]) => void,
   onError?: (err: Error) => void,
 ): Unsubscribe {
   const q = query(collection(db, USERS), orderBy('createdAt', 'desc'));
+  let receivedServerData = false;
   return onSnapshot(
     q,
+    // 需要 metadata 變化通知：快取快照之後，伺服器確認「內容相同」時只會發 metadata 變化，
+    // 不開這個選項就收不到，第一份資料永遠不會交出去。
+    { includeMetadataChanges: true },
     (snap) => {
+      if (!receivedServerData) {
+        if (snap.metadata.fromCache) return;
+        receivedServerData = true;
+      }
       onData(snap.docs.map((d) => toUserProfile(d.id, d.data({ serverTimestamps: 'estimate' }))));
     },
     (err) => onError?.(toError(err)),
