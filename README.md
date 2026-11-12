@@ -22,7 +22,8 @@
 - **分開的原因**：Tailwind 的全域重設樣式（preflight）與 Claude Flow 的樣式會互相覆蓋，獨立頁面讓兩邊完全隔離。
 - **共用登入**：兩頁共用 `src/lib/firebase.ts` 的同一個 Firebase 實例，同網域的登入狀態自動共通。
 - **管理員限定**：`src/stock/main.jsx` 先確認 `users/{uid}` 為未停用的 admin，才啟動雲端同步並顯示畫面。權限確認前絕不同步，否則同一台電腦上前一位使用者的本機持股可能被寫進別人的雲端文件。
-- **後端 API 沒有登入驗證**：`/api/*` 和原台股分析網站一樣，任何人知道網址都能呼叫（含 Gemini AI 分析）。管理員限定只擋得住畫面入口。
+- **後端 API 也只開放給管理員**：前端每個請求都帶 Firebase ID token，`api/_lib/auth.js` 拿這個 token 去讀 Firestore 的 `users/{uid}`。token 偽造或過期時 Google 會直接拒絕，讀到的文件同時用來確認是未停用的 admin。不需要 service account 金鑰。驗證結果快取 60 秒，所以被降級的管理員最多還能呼叫 60 秒。
+- **API 回應不經 Vercel 邊緣快取**：成功回應只允許瀏覽器快取（`private, max-age=30`）。邊緣快取命中的請求不會進到函式，等於繞過登入驗證。
 
 ## 本地開發（Emulator，不需要真的 Firebase 專案）
 
@@ -63,5 +64,5 @@ npm run typecheck
 
 - **停用只在應用層生效**：被停用的人仍能透過 Firebase Auth 登入，但會被守衛攔在停用提示頁，也無法寫入資料。要真正封鎖登入需 Admin SDK（Cloud Functions，需 Blaze 方案）。
 - Firebase 預設「一個 email 一個帳號」：先用 Email/密碼註冊、後用同 email 的 Google 登入時，Google 作為可信提供方會取代未驗證的密碼登入方式（Firebase 本身的行為）。
-- 台股的 `/api/*` 沒有登入驗證（見上方「台股分析的架構」）。
+- 本機 Emulator 不驗證 token 簽章，偽造 token 的防護只在正式環境（真正的 Firestore）成立；自動測試以模擬 Firestore 回應涵蓋這部分。
 - 台股與原網站同時開著時，雲端同步有原專案已知的 2 秒競態窗口（同時在兩邊改帳上現金或統計起算日，可能被另一邊蓋回）。

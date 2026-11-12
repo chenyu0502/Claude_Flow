@@ -2,12 +2,23 @@
  * 把純函式 handler 接到 Vercel serverless function 的 (req, res) 介面上。
  */
 
+import { verifyAdmin } from './auth.js';
+
 /**
  * @param {(input: object, env: object) => Promise<{status:number, body:*, noStore?:boolean}>} handler
+ * @param {{ verify?: typeof verifyAdmin }} [options] 測試用：替換驗證函式
  * @returns {(req: object, res: object) => Promise<void>}
  */
-export function toVercelHandler(handler) {
+export function toVercelHandler(handler, { verify = verifyAdmin } = {}) {
   return async function vercelHandler(req, res) {
+    // 每個端點都只開放給 Claude Flow 的管理員，驗證放在最前面，handler 一律不會被未授權的請求執行。
+    const auth = await verify(req.headers?.authorization, process.env);
+    if (!auth.ok) {
+      res.setHeader('Cache-Control', 'no-store');
+      res.status(auth.status).json({ error: auth.error });
+      return;
+    }
+
     try {
       // 查詢字串與請求主體合併成單一輸入物件，handler 不需要區分兩者的來源。
       // Vercel 會依 Content-Type 自動解析 JSON 主體。
@@ -22,8 +33,10 @@ export function toVercelHandler(handler) {
         // 邊緣節點重複供應最長五分鐘——使用者重新整理也沒用，看起來像壞掉很久。
         res.setHeader('Cache-Control', 'no-store');
       } else {
-        // 同一交易日內資料不會變動太快，讓 Vercel Edge 快取吸收重複請求。
-        res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=300');
+        // 只允許瀏覽器快取（private），不能再用 s-maxage 讓 Vercel 邊緣節點快取：
+        // 邊緣快取命中的請求根本不會進到這個函式，等於繞過上面的登入驗證，
+        // 任何人打同一個網址都能拿到快取內容。
+        res.setHeader('Cache-Control', 'private, max-age=30');
       }
       res.status(result.status).json(result.body);
     } catch (err) {
