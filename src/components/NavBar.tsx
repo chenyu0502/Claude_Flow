@@ -63,9 +63,15 @@ export default function NavBar() {
                 個人資料
               </NavLink>
               {isAdmin && (
-                <NavLink to="/admin/users" className={navClass}>
-                  使用者管理
-                </NavLink>
+                <>
+                  {/* 台股分析是獨立頁面（/stock/），用一般連結整頁切換，不走 React Router */}
+                  <a href="/stock/" className="nav-link">
+                    台股分析
+                  </a>
+                  <NavLink to="/admin/users" className={navClass}>
+                    使用者管理
+                  </NavLink>
+                </>
               )}
               <button type="button" className="btn btn-sm" onClick={handleSignOut} disabled={signingOut}>
                 登出

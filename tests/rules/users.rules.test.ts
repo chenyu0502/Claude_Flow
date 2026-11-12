@@ -356,6 +356,26 @@ describe('没有 users 文档的登录用户', () => {
   });
 });
 
+describe('portfolios（台股分析）', () => {
+  it('本人可讀寫自己的投資組合', async () => {
+    await assertSucceeds(setDoc(doc(dbAs('alice'), 'portfolios', 'alice'), { cash: 1000 }));
+    await assertSucceeds(getDoc(doc(dbAs('alice'), 'portfolios', 'alice')));
+  });
+
+  it('不能讀寫別人的投資組合（含 admin）', async () => {
+    await seed({ uid: 'admin', role: 'admin' });
+    await assertFails(getDoc(doc(dbAs('alice'), 'portfolios', 'bob')));
+    await assertFails(setDoc(doc(dbAs('alice'), 'portfolios', 'bob'), { cash: 1 }));
+    await assertFails(getDoc(doc(dbAs('admin'), 'portfolios', 'alice')));
+  });
+
+  it('未登入不能讀寫', async () => {
+    const db = testEnv.unauthenticatedContext().firestore();
+    await assertFails(getDoc(doc(db, 'portfolios', 'alice')));
+    await assertFails(setDoc(doc(db, 'portfolios', 'alice'), { cash: 1 }));
+  });
+});
+
 describe('其他集合', () => {
   it('全部拒绝（含 admin）', async () => {
     await seed({ uid: 'admin', role: 'admin' });

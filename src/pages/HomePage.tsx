@@ -47,6 +47,12 @@ export default function HomePage() {
         </div>
       </div>
       {isAdmin && (
+        <a href="/stock/" className="card home-link-card">
+          <h2>台股分析</h2>
+          <p className="muted">持股、績效、個股分析與 AI 解讀 →</p>
+        </a>
+      )}
+      {isAdmin && (
         <Link to="/admin/users" className="card home-link-card">
           <h2>使用者管理</h2>
           <p className="muted">檢視所有使用者、調整角色與停用帳號 →</p>

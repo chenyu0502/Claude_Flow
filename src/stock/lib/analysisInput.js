@@ -1,0 +1,260 @@
+/**
+ * 組出送給 AI 分析端點的請求內容。
+ *
+ * 這裡負責把 K 線轉成模型需要的摘要：價位結構、指標快照、近期走勢。
+ * 刻意不送完整 K 線序列，理由有二：
+ * 1. 模型不需要逐日資料就能做型態判讀。
+ * 2. 送整串會誘使模型自行從數列裡挑價格，違反「價位一律由程式計算」的原則。
+ */
+
+import { computeLevels } from './levels.js';
+import { crossState, kd, macd, rsi, bias, atr, sma } from './indicators.js';
+
+/** 用於計算近期漲跌幅的區間長度。 */
+const RECENT_WINDOW = 20;
+
+/**
+ * @param {object} params
+ * @param {string} params.code
+ * @param {string} [params.name]
+ * @param {object[]} params.candles
+ * @param {number} params.maShort
+ * @param {number} params.maLong
+ * @param {object} [params.valuation] 本益比、股價淨值比、殖利率，長線判斷需要
+ * @param {object} [params.institutional] 當日三大法人買賣超
+ * @param {object[]} [params.chipSeries] 法人買賣超歷史序列，中線判斷需要
+ * @param {object} [params.margin] 融資融券
+ * @param {object} [params.fundamentals] /api/fundamentals 的結果，供估值解讀
+ * @param {object} [params.peers] /api/peers 的結果，供同業估值比較
+ * @param {object[]} [params.risks] detectRisks() 的結果，供風險綜述
+ * @returns {object|null} 資料不足時回傳 null
+ */
+export function buildAnalysisInput({
+  code,
+  name,
+  candles,
+  maShort,
+  maLong,
+  valuation,
+  institutional,
+  chipSeries,
+  margin,
+  fundamentals,
+  peers,
+  risks,
+}) {
+  if (!candles || candles.length < 60) return null;
+
+  const levels = computeLevels(candles);
+  if (!levels) return null;
+
+  const closes = candles.map((c) => c.close);
+  const last = candles.length - 1;
+
+  const { k, d } = kd(candles);
+  const { dif, histogram } = macd(closes);
+  const rsiSeries = rsi(closes);
+  const bias5 = bias(closes, 5);
+  const bias20 = bias(closes, 20);
+  const atrSeries = atr(candles);
+  const cross = crossState(closes, maShort, maLong);
+
+  // 量能比反映近期是否有增溫或萎縮，是判斷突破真假的重要輔助。
+  const volumes = candles.map((c) => c.volume ?? 0);
+  const avg = (arr) => (arr.length === 0 ? null : arr.reduce((a, b) => a + b, 0) / arr.length);
+  const vol5 = avg(volumes.slice(-5));
+  const vol20 = avg(volumes.slice(-20));
+
+  const base = closes[Math.max(0, last - RECENT_WINDOW)];
+  const periodHigh = Math.max(...candles.map((c) => c.high));
+  const periodLow = Math.min(...candles.map((c) => c.low));
+
+  // 120 日均線代表長期趨勢方向，與其斜率一併送出，長線立場判斷需要。
+  const ma120Series = sma(closes, 120);
+  const ma120 = ma120Series[last];
+  const ma120Prev = ma120Series[Math.max(0, last - 20)];
+
+  return {
+    code,
+    name,
+    price: levels.price,
+    levels: {
+      supports: levels.supports,
+      resistances: levels.resistances,
+    },
+    indicators: {
+      k: k[last],
+      d: d[last],
+      rsi: rsiSeries[last],
+      dif: dif[last],
+      histogram: histogram[last],
+      maShort,
+      maLong,
+      shortMa: sma(closes, maShort)[last],
+      longMa: sma(closes, maLong)[last],
+      ma120,
+      // 以近 20 日的變化量表示長期均線是走揚還是走跌。
+      ma120Slope: ma120 !== null && ma120Prev ? ((ma120 - ma120Prev) / ma120Prev) * 100 : null,
+      crossLabel: cross.label,
+      bias5: bias5[last],
+      bias20: bias20[last],
+      atr: atrSeries[last],
+    },
+    recent: {
+      periodDays: candles.length,
+      high: periodHigh,
+      low: periodLow,
+      change20: base ? ((closes[last] - base) / base) * 100 : null,
+      volumeRatio: vol20 ? vol5 / vol20 : null,
+      // 現價在期間高低之間的位置，用來判斷是處於相對高檔還是低檔。
+      pricePosition:
+        periodHigh > periodLow ? ((closes[last] - periodLow) / (periodHigh - periodLow)) * 100 : null,
+    },
+    valuation: valuation
+      ? {
+          peRatio: valuation.peRatio,
+          pbRatio: valuation.pbRatio,
+          dividendYield: valuation.dividendYield,
+        }
+      : null,
+    fundamentals: buildFundamentalSummary(fundamentals),
+    peers: buildPeerSummary(peers),
+    // 風險由 detectRisks() 依固定門檻算出，模型只負責串成敘述，不得自行新增項目。
+    risks: Array.isArray(risks)
+      ? risks.map((r) => ({ category: r.category, severity: r.severity, message: r.message }))
+      : null,
+    chips: buildChipSummary({ institutional, chipSeries, margin }),
+  };
+}
+
+/**
+ * 壓縮基本面資料，只留模型敘述時真正用得到的欄位。
+ *
+ * 完整的 /api/fundamentals 回應含分位帶的四分位、月營收序列與六年股利明細，
+ * 那些是給圖表用的。全部送進提示詞只會膨脹 token，也增加模型從中挑數字的機會。
+ *
+ * @param {object|null} f
+ * @returns {object|null}
+ */
+function buildFundamentalSummary(f) {
+  if (!f?.available) return null;
+
+  const band = (b) =>
+    b ? { current: b.current, percentile: b.percentile, median: b.median, samples: b.samples } : null;
+
+  return {
+    pe: band(f.bands?.pe),
+    pb: band(f.bands?.pb),
+    dividendYield: band(f.bands?.dividendYield),
+    epsTtm: f.income?.epsTtm ?? null,
+    roe: f.roe?.value ?? null,
+    margins: f.income?.margins ?? null,
+    marginsYearAgo: f.income?.marginsYearAgo ?? null,
+    revenueYoy: f.revenue?.yoy ?? null,
+    revenueYoy3m: f.revenue?.yoy3m ?? null,
+    debtRatio: f.balance?.debtRatio ?? null,
+    dividend: f.dividend
+      ? {
+          latestCash: f.dividend.latestCash,
+          consecutiveCashYears: f.dividend.consecutiveCashYears,
+          payoutRatio: f.dividend.payoutRatio,
+        }
+      : null,
+  };
+}
+
+/**
+ * 壓縮同業比較資料。
+ *
+ * 只留統計量與少數幾檔同業明細。完整回應含最多十一檔鄰近同業的三項指標，
+ * 全部送進提示詞會膨脹 token，也讓模型多出一堆可以拿來自行運算的數字——
+ * 中位數與分位已經算好了，模型的工作是解讀，不是重算。
+ *
+ * @param {object|null} p
+ * @returns {object|null}
+ */
+function buildPeerSummary(p) {
+  if (!p?.available) return null;
+
+  const metric = (m) =>
+    m
+      ? {
+          self: m.self,
+          median: m.median,
+          p25: m.p25,
+          p75: m.p75,
+          percentile: m.percentile,
+          rank: m.rank,
+          samples: m.samples,
+        }
+      : null;
+
+  return {
+    industry: p.industry,
+    peerCount: p.peerCount,
+    // 樣本不足時仍然送出，但要讓模型知道，否則它會拿三家公司的中位數當產業水準。
+    sufficient: p.sufficient,
+    pe: metric(p.metrics?.pe),
+    pb: metric(p.metrics?.pb),
+    dividendYield: metric(p.metrics?.dividendYield),
+    // 鄰近同業只取本檔上下各兩檔，足夠讓敘述舉得出實例，又不會灌爆提示詞。
+    neighbors: pickAround(p.neighbors ?? [], 2),
+  };
+}
+
+/**
+ * 取出本檔（self 為 true）上下各 span 檔。
+ * @param {object[]} rows
+ * @param {number} span
+ * @returns {object[]}
+ */
+function pickAround(rows, span) {
+  const index = rows.findIndex((r) => r.self);
+  if (index < 0) return rows.slice(0, span * 2 + 1);
+  return rows.slice(Math.max(0, index - span), index + span + 1);
+}
+
+/**
+ * 彙整籌碼面摘要。
+ *
+ * 中線立場很大程度取決於法人的持續動向，單看當日買賣超會被單日的異常值誤導，
+ * 因此同時提供近 5 日與近 20 日的累計。
+ *
+ * @param {{ institutional?: object, chipSeries?: object[], margin?: object }} params
+ * @returns {object|null}
+ */
+function buildChipSummary({ institutional, chipSeries, margin }) {
+  if (!institutional && !chipSeries && !margin) return null;
+
+  const sum = (series, key) => series.reduce((acc, row) => acc + (row[key] ?? 0), 0);
+  const series = Array.isArray(chipSeries) ? chipSeries : [];
+
+  return {
+    today: institutional
+      ? { foreign: institutional.foreign, trust: institutional.trust, dealer: institutional.dealer }
+      : null,
+    last5:
+      series.length > 0
+        ? {
+            foreign: sum(series.slice(-5), 'foreign'),
+            trust: sum(series.slice(-5), 'trust'),
+            dealer: sum(series.slice(-5), 'dealer'),
+          }
+        : null,
+    last20:
+      series.length > 0
+        ? {
+            foreign: sum(series.slice(-20), 'foreign'),
+            trust: sum(series.slice(-20), 'trust'),
+            dealer: sum(series.slice(-20), 'dealer'),
+          }
+        : null,
+    margin: margin
+      ? {
+          marginChange: margin.marginChange,
+          shortChange: margin.shortChange,
+          shortMarginRatio: margin.shortMarginRatio,
+        }
+      : null,
+  };
+}
