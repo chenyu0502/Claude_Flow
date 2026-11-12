@@ -6,7 +6,7 @@ import { authErrorMessage } from '../services/auth';
 import './auth.css';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-export const RESET_SENT_MESSAGE = '若此 email 已注册，重设密码邮件已寄出';
+export const RESET_SENT_MESSAGE = '若此 email 已註冊，重設密碼郵件已寄出';
 
 function errorCode(err: unknown): string | undefined {
   if (typeof err === 'object' && err !== null && 'code' in err) {
@@ -28,11 +28,11 @@ export default function ResetPasswordPage() {
     setError(null);
     const trimmed = email.trim();
     if (!trimmed) {
-      setError('请输入 email');
+      setError('請輸入 email');
       return;
     }
     if (!EMAIL_RE.test(trimmed)) {
-      setError('email 格式不正确');
+      setError('email 格式不正確');
       return;
     }
     setSubmitting(true);
@@ -40,7 +40,7 @@ export default function ResetPasswordPage() {
       await resetPassword(trimmed);
       setSent(true);
     } catch (err) {
-      // 不透露账号是否存在：user-not-found 也视为成功
+      // 不透露帳號是否存在：user-not-found 也視為成功
       if (errorCode(err) === 'auth/user-not-found') setSent(true);
       else setError(authErrorMessage(err));
     } finally {
@@ -51,8 +51,8 @@ export default function ResetPasswordPage() {
   return (
     <div className="container narrow auth-page">
       <div className="card auth-card">
-        <h1>重设密码</h1>
-        <p className="auth-subtitle">输入注册时使用的 email，我们会寄送重设密码链接</p>
+        <h1>重設密碼</h1>
+        <p className="auth-subtitle">輸入註冊時使用的 email，我們會寄送重設密碼連結</p>
 
         <div className="auth-alerts">
           {sent && (
@@ -84,12 +84,12 @@ export default function ResetPasswordPage() {
             />
           </div>
           <button type="submit" className="btn btn-primary btn-block" disabled={submitting}>
-            {submitting ? '寄送中…' : '寄送重设邮件'}
+            {submitting ? '寄送中…' : '寄送重設郵件'}
           </button>
         </form>
 
         <p className="auth-footer">
-          <Link to="/login">返回登录</Link>
+          <Link to="/login">返回登入</Link>
         </p>
       </div>
     </div>

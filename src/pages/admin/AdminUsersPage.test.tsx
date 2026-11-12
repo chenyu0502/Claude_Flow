@@ -91,40 +91,41 @@ beforeEach(() => {
 });
 
 describe('AdminUsersPage', () => {
-  it('渲染列表与统计', () => {
+  it('渲染列表與統計', () => {
     render(<AdminUsersPage />);
     expect(screen.getByTestId('stat-total')).toHaveTextContent('4');
     expect(screen.getByTestId('stat-admins')).toHaveTextContent('2');
     expect(screen.getByTestId('stat-disabled')).toHaveTextContent('1');
 
-    expect(screen.getAllByRole('row')).toHaveLength(5); // 表头 + 4
+    expect(screen.getAllByRole('row')).toHaveLength(5); // 表頭 + 4
     expect(within(row('u2')).getByText('alice@example.com')).toBeInTheDocument();
     expect(within(row('u2')).getByText('GitHub')).toBeInTheDocument();
-    expect(within(row('u2')).getByText('Email/密码')).toBeInTheDocument();
+    expect(within(row('u2')).getByText('Email/密碼')).toBeInTheDocument();
     expect(within(row('u4')).getByText('已停用')).toBeInTheDocument();
-    // 最后登录为 null 显示「—」
+    // 最後登入為 null 顯示「—」
     expect(within(row('u2')).getAllByText('—').length).toBeGreaterThan(0);
     expect(
-      within(row('u3')).getByText(new Date('2026-10-01T00:00:00Z').toLocaleString('zh-CN')),
+      // zh-TW 格式含窄空格（U+2009），Testing Library 只正規化畫面文字，預期值要同樣正規化
+      within(row('u3')).getByText(new Date('2026-10-01T00:00:00Z').toLocaleString('zh-TW').replace(/\s+/g, ' ')),
     ).toBeInTheDocument();
   });
 
-  it('显示载入中（尚未回调）', () => {
+  it('顯示載入中（尚未回撥）', () => {
     mocks.subscribeAllUsers.mockImplementation(() => mocks.unsubscribe);
     render(<AdminUsersPage />);
-    expect(screen.getByText('载入中…')).toBeInTheDocument();
+    expect(screen.getByText('載入中…')).toBeInTheDocument();
   });
 
-  it('空列表状态', () => {
+  it('空列表狀態', () => {
     emitUsers([]);
     render(<AdminUsersPage />);
-    expect(screen.getByText('目前还没有任何用户')).toBeInTheDocument();
+    expect(screen.getByText('目前還沒有任何使用者')).toBeInTheDocument();
   });
 
-  it('搜索 email / displayName 不分大小写', async () => {
+  it('搜尋 email / displayName 不分大小寫', async () => {
     const user = userEvent.setup();
     render(<AdminUsersPage />);
-    const search = screen.getByLabelText('搜索');
+    const search = screen.getByLabelText('搜尋');
 
     await user.type(search, 'ALICE');
     expect(screen.getByTestId('user-row-u2')).toBeInTheDocument();
@@ -137,13 +138,13 @@ describe('AdminUsersPage', () => {
 
     await user.clear(search);
     await user.type(search, 'nobody');
-    expect(screen.getByText('没有符合条件的用户')).toBeInTheDocument();
+    expect(screen.getByText('沒有符合條件的使用者')).toBeInTheDocument();
   });
 
-  it('筛选 admin / user / 已停用', async () => {
+  it('篩選 admin / user / 已停用', async () => {
     const user = userEvent.setup();
     render(<AdminUsersPage />);
-    const filter = screen.getByLabelText('筛选');
+    const filter = screen.getByLabelText('篩選');
 
     await user.selectOptions(filter, 'admin');
     expect(screen.queryByTestId('user-row-me')).toBeInTheDocument();
@@ -160,7 +161,7 @@ describe('AdminUsersPage', () => {
     expect(screen.queryByTestId('user-row-u3')).not.toBeInTheDocument();
   });
 
-  it('自己那列操作 disabled 并标「（你）」', () => {
+  it('自己那列操作 disabled 並標「（你）」', () => {
     render(<AdminUsersPage />);
     const mine = row('me');
     expect(within(mine).getByText('（你）')).toBeInTheDocument();
@@ -168,12 +169,12 @@ describe('AdminUsersPage', () => {
     const btn = within(mine).getByRole('button', { name: '停用' });
     expect(select).toBeDisabled();
     expect(btn).toBeDisabled();
-    expect(btn).toHaveAttribute('title', '不能修改自己的角色或状态');
-    // 别人那列可操作
+    expect(btn).toHaveAttribute('title', '不能修改自己的角色或狀態');
+    // 別人那列可操作
     expect(within(row('u3')).getByRole('combobox')).toBeEnabled();
   });
 
-  it('降级 admin 先 confirm，确认后调用 setUserRole', async () => {
+  it('降級 admin 先 confirm，確認後呼叫 setUserRole', async () => {
     const user = userEvent.setup();
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
     render(<AdminUsersPage />);
@@ -182,7 +183,7 @@ describe('AdminUsersPage', () => {
     expect(mocks.setUserRole).toHaveBeenCalledWith('u2', 'user');
   });
 
-  it('降级 admin 取消 confirm 则不调用', async () => {
+  it('降級 admin 取消 confirm 則不呼叫', async () => {
     const user = userEvent.setup();
     vi.spyOn(window, 'confirm').mockReturnValue(false);
     render(<AdminUsersPage />);
@@ -190,7 +191,7 @@ describe('AdminUsersPage', () => {
     expect(mocks.setUserRole).not.toHaveBeenCalled();
   });
 
-  it('升级为 admin 不需要 confirm', async () => {
+  it('升級為 admin 不需要 confirm', async () => {
     const user = userEvent.setup();
     const confirm = vi.spyOn(window, 'confirm');
     render(<AdminUsersPage />);
@@ -199,7 +200,7 @@ describe('AdminUsersPage', () => {
     expect(mocks.setUserRole).toHaveBeenCalledWith('u3', 'admin');
   });
 
-  it('停用先 confirm 后调用 setUserDisabled(true)；启用直接调用', async () => {
+  it('停用先 confirm 後呼叫 setUserDisabled(true)；啟用直接呼叫', async () => {
     const user = userEvent.setup();
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
     render(<AdminUsersPage />);
@@ -207,12 +208,12 @@ describe('AdminUsersPage', () => {
     expect(confirm).toHaveBeenCalledTimes(1);
     expect(mocks.setUserDisabled).toHaveBeenCalledWith('u3', true);
 
-    await user.click(within(row('u4')).getByRole('button', { name: '启用' }));
+    await user.click(within(row('u4')).getByRole('button', { name: '啟用' }));
     expect(confirm).toHaveBeenCalledTimes(1);
     expect(mocks.setUserDisabled).toHaveBeenCalledWith('u4', false);
   });
 
-  it('操作进行中该列按钮 disabled，完成后恢复', async () => {
+  it('操作進行中該列按鈕 disabled，完成後恢復', async () => {
     const user = userEvent.setup();
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     let resolve!: () => void;
@@ -226,7 +227,7 @@ describe('AdminUsersPage', () => {
     await waitFor(() => expect(within(row('u3')).getByRole('button', { name: '停用' })).toBeEnabled());
   });
 
-  it('操作失败显示 .alert-error', async () => {
+  it('操作失敗顯示 .alert-error', async () => {
     const user = userEvent.setup();
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     mocks.setUserDisabled.mockRejectedValue(Object.assign(new Error('denied'), { code: 'permission-denied' }));
@@ -234,10 +235,10 @@ describe('AdminUsersPage', () => {
     await user.click(within(row('u3')).getByRole('button', { name: '停用' }));
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveClass('alert-error');
-    expect(alert).toHaveTextContent('操作失败：没有权限');
+    expect(alert).toHaveTextContent('操作失敗：沒有權限');
   });
 
-  it('订阅错误 permission-denied 显示「没有权限读取用户列表」', () => {
+  it('訂閱錯誤 permission-denied 顯示「沒有權限讀取使用者列表」', () => {
     mocks.subscribeAllUsers.mockImplementation((_onData: unknown, onError?: (e: Error) => void) => {
       onError?.(Object.assign(new Error('Missing or insufficient permissions.'), { code: 'permission-denied' }));
       return mocks.unsubscribe;
@@ -245,10 +246,10 @@ describe('AdminUsersPage', () => {
     render(<AdminUsersPage />);
     const alert = screen.getByRole('alert');
     expect(alert).toHaveClass('alert-error');
-    expect(alert).toHaveTextContent('没有权限读取用户列表');
+    expect(alert).toHaveTextContent('沒有權限讀取使用者列表');
   });
 
-  it('unmount 时退订', () => {
+  it('unmount 時退訂', () => {
     const { unmount } = render(<AdminUsersPage />);
     expect(mocks.subscribeAllUsers).toHaveBeenCalledTimes(1);
     expect(mocks.unsubscribe).not.toHaveBeenCalled();

@@ -5,23 +5,23 @@ export type Role = 'admin' | 'user';
 /** Firebase Auth 的 providerId */
 export type ProviderId = 'google.com' | 'github.com' | 'password';
 
-/** Firestore 文档 users/{uid} 的结构。文档 ID 即 uid。 */
+/** Firestore 文件 users/{uid} 的結構。文件 ID 即 uid。 */
 export interface UserProfile {
   uid: string;
   email: string | null;
   displayName: string | null;
   photoURL: string | null;
-  /** 只有 admin 能修改；新建时一律为 'user' */
+  /** 只有 admin 能修改；新建時一律為 'user' */
   role: Role;
-  /** 只有 admin 能修改；停用后无法使用需登录的页面，也无法写入自己的文档 */
+  /** 只有 admin 能修改；停用後無法使用需登入的頁面，也無法寫入自己的文件 */
   disabled: boolean;
-  /** 该账号已绑定的登录方式，登录时由客户端同步 */
+  /** 該帳號已綁定的登入方式，登入時由客戶端同步 */
   providers: ProviderId[];
   createdAt: Timestamp | null;
   lastLoginAt: Timestamp | null;
 }
 
-/** 用户本人可以修改的字段 */
+/** 使用者本人可以修改的欄位 */
 export type EditableProfileFields = Pick<UserProfile, 'displayName' | 'photoURL'>;
 
 export const SUPPORTED_PROVIDERS: ProviderId[] = ['google.com', 'github.com', 'password'];
@@ -29,5 +29,5 @@ export const SUPPORTED_PROVIDERS: ProviderId[] = ['google.com', 'github.com', 'p
 export const PROVIDER_LABELS: Record<ProviderId, string> = {
   'google.com': 'Google',
   'github.com': 'GitHub',
-  password: 'Email/密码',
+  password: 'Email/密碼',
 };

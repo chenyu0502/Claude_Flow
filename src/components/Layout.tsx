@@ -1,4 +1,4 @@
-// OWNER: Agent E（含顶部导航列）
+// OWNER: Agent E（含頂部導航列）
 import { Outlet } from 'react-router-dom';
 import NavBar from './NavBar';
 

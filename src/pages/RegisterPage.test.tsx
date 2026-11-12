@@ -7,7 +7,7 @@ import { useAuth, type AuthContextValue } from '../auth/AuthContext';
 
 vi.mock('../auth/AuthContext', () => ({ useAuth: vi.fn() }));
 vi.mock('../services/auth', () => ({
-  authErrorMessage: vi.fn(() => '该 email 已被注册'),
+  authErrorMessage: vi.fn(() => '該 email 已被註冊'),
   isUserCancelled: vi.fn(() => false),
 }));
 
@@ -36,87 +36,87 @@ function renderRegister() {
     <MemoryRouter initialEntries={['/register']}>
       <Routes>
         <Route path="/register" element={<RegisterPage />} />
-        <Route path="/" element={<div>首页内容</div>} />
+        <Route path="/" element={<div>首頁內容</div>} />
       </Routes>
     </MemoryRouter>,
   );
 }
 
 async function fill(v: { name?: string; email?: string; password?: string; confirm?: string }) {
-  if (v.name) await userEvent.type(screen.getByLabelText('显示名称'), v.name);
+  if (v.name) await userEvent.type(screen.getByLabelText('顯示名稱'), v.name);
   if (v.email) await userEvent.type(screen.getByLabelText('Email'), v.email);
-  if (v.password) await userEvent.type(screen.getByLabelText('密码'), v.password);
-  if (v.confirm) await userEvent.type(screen.getByLabelText('确认密码'), v.confirm);
+  if (v.password) await userEvent.type(screen.getByLabelText('密碼'), v.password);
+  if (v.confirm) await userEvent.type(screen.getByLabelText('確認密碼'), v.confirm);
 }
 
-const submit = () => userEvent.click(screen.getByRole('button', { name: '注册' }));
+const submit = () => userEvent.click(screen.getByRole('button', { name: '註冊' }));
 
 describe('RegisterPage', () => {
-  it('input 有 label 与正确的 autoComplete，并提供 OAuth 按钮', () => {
+  it('input 有 label 與正確的 autoComplete，並提供 OAuth 按鈕', () => {
     mockedUseAuth.mockReturnValue(makeAuth());
     renderRegister();
-    expect(screen.getByLabelText('显示名称')).toHaveAttribute('autocomplete', 'name');
+    expect(screen.getByLabelText('顯示名稱')).toHaveAttribute('autocomplete', 'name');
     expect(screen.getByLabelText('Email')).toHaveAttribute('autocomplete', 'email');
-    expect(screen.getByLabelText('密码')).toHaveAttribute('autocomplete', 'new-password');
-    expect(screen.getByLabelText('确认密码')).toHaveAttribute('autocomplete', 'new-password');
-    expect(screen.getByRole('button', { name: /使用 Google 登录/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /使用 GitHub 登录/ })).toBeInTheDocument();
+    expect(screen.getByLabelText('密碼')).toHaveAttribute('autocomplete', 'new-password');
+    expect(screen.getByLabelText('確認密碼')).toHaveAttribute('autocomplete', 'new-password');
+    expect(screen.getByRole('button', { name: /使用 Google 登入/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /使用 GitHub 登入/ })).toBeInTheDocument();
   });
 
-  it('空白提交显示所有必填错误', async () => {
+  it('空白提交顯示所有必填錯誤', async () => {
     const auth = makeAuth();
     mockedUseAuth.mockReturnValue(auth);
     renderRegister();
     await submit();
-    expect(screen.getByText('请输入显示名称')).toBeInTheDocument();
-    expect(screen.getByText('请输入 email')).toBeInTheDocument();
-    expect(screen.getByText('请输入密码')).toBeInTheDocument();
-    expect(screen.getByText('请再次输入密码')).toBeInTheDocument();
-    expect(screen.getByLabelText('显示名称')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByText('請輸入顯示名稱')).toBeInTheDocument();
+    expect(screen.getByText('請輸入 email')).toBeInTheDocument();
+    expect(screen.getByText('請輸入密碼')).toBeInTheDocument();
+    expect(screen.getByText('請再次輸入密碼')).toBeInTheDocument();
+    expect(screen.getByLabelText('顯示名稱')).toHaveAttribute('aria-invalid', 'true');
     expect(auth.signUpWithEmail).not.toHaveBeenCalled();
   });
 
-  it('email 格式错误', async () => {
+  it('email 格式錯誤', async () => {
     const auth = makeAuth();
     mockedUseAuth.mockReturnValue(auth);
     renderRegister();
     await fill({ name: '小明', email: 'not-an-email', password: 'secret1', confirm: 'secret1' });
     await submit();
-    expect(screen.getByText('email 格式不正确')).toBeInTheDocument();
+    expect(screen.getByText('email 格式不正確')).toBeInTheDocument();
     expect(auth.signUpWithEmail).not.toHaveBeenCalled();
   });
 
-  it('密码少于 6 字', async () => {
+  it('密碼少於 6 字', async () => {
     const auth = makeAuth();
     mockedUseAuth.mockReturnValue(auth);
     renderRegister();
     await fill({ name: '小明', email: 'a@b.com', password: '12345', confirm: '12345' });
     await submit();
-    expect(screen.getByText('密码至少需要 6 个字符')).toBeInTheDocument();
+    expect(screen.getByText('密碼至少需要 6 個字元')).toBeInTheDocument();
     expect(auth.signUpWithEmail).not.toHaveBeenCalled();
   });
 
-  it('两次密码不一致', async () => {
+  it('兩次密碼不一致', async () => {
     const auth = makeAuth();
     mockedUseAuth.mockReturnValue(auth);
     renderRegister();
     await fill({ name: '小明', email: 'a@b.com', password: 'secret1', confirm: 'secret2' });
     await submit();
-    expect(screen.getByText('两次输入的密码不一致')).toBeInTheDocument();
+    expect(screen.getByText('兩次輸入的密碼不一致')).toBeInTheDocument();
     expect(auth.signUpWithEmail).not.toHaveBeenCalled();
   });
 
-  it('名称超过 50 字', async () => {
+  it('名稱超過 50 字', async () => {
     const auth = makeAuth();
     mockedUseAuth.mockReturnValue(auth);
     renderRegister();
     await fill({ name: '名'.repeat(51), email: 'a@b.com', password: 'secret1', confirm: 'secret1' });
     await submit();
-    expect(screen.getByText('显示名称不能超过 50 个字')).toBeInTheDocument();
+    expect(screen.getByText('顯示名稱不能超過 50 個字')).toBeInTheDocument();
     expect(auth.signUpWithEmail).not.toHaveBeenCalled();
   });
 
-  it('名称刚好 50 字可通过', async () => {
+  it('名稱剛好 50 字可透過', async () => {
     const auth = makeAuth();
     mockedUseAuth.mockReturnValue(auth);
     renderRegister();
@@ -125,40 +125,40 @@ describe('RegisterPage', () => {
     expect(auth.signUpWithEmail).toHaveBeenCalledWith('a@b.com', 'secret1', '名'.repeat(50));
   });
 
-  it('校验通过后调用 signUpWithEmail（trim）并导向首页', async () => {
+  it('校驗透過後呼叫 signUpWithEmail（trim）並導向首頁', async () => {
     const auth = makeAuth();
     mockedUseAuth.mockReturnValue(auth);
     renderRegister();
     await fill({ name: ' 小明 ', email: ' a@b.com ', password: 'secret1', confirm: 'secret1' });
     await submit();
     expect(auth.signUpWithEmail).toHaveBeenCalledWith('a@b.com', 'secret1', '小明');
-    expect(await screen.findByText('首页内容')).toBeInTheDocument();
+    expect(await screen.findByText('首頁內容')).toBeInTheDocument();
   });
 
-  it('注册失败显示错误讯息', async () => {
+  it('註冊失敗顯示錯誤訊息', async () => {
     const auth = makeAuth({ signUpWithEmail: vi.fn().mockRejectedValue(new Error('in use')) });
     mockedUseAuth.mockReturnValue(auth);
     renderRegister();
     await fill({ name: '小明', email: 'a@b.com', password: 'secret1', confirm: 'secret1' });
     await submit();
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('该 email 已被注册');
+    expect(alert).toHaveTextContent('該 email 已被註冊');
     expect(alert).toHaveClass('alert-error');
-    expect(screen.getByRole('button', { name: '注册' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '註冊' })).toBeEnabled();
   });
 
-  it('提交中按钮 disabled', async () => {
+  it('提交中按鈕 disabled', async () => {
     const auth = makeAuth({ signUpWithEmail: vi.fn(() => new Promise<void>(() => {})) });
     mockedUseAuth.mockReturnValue(auth);
     renderRegister();
     await fill({ name: '小明', email: 'a@b.com', password: 'secret1', confirm: 'secret1' });
     await submit();
-    expect(screen.getByRole('button', { name: '注册中…' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '註冊中…' })).toBeDisabled();
   });
 
-  it('已登录时重导到首页', () => {
+  it('已登入時重導到首頁', () => {
     mockedUseAuth.mockReturnValue(makeAuth({ user: { uid: 'u1' } as User }));
     renderRegister();
-    expect(screen.getByText('首页内容')).toBeInTheDocument();
+    expect(screen.getByText('首頁內容')).toBeInTheDocument();
   });
 });

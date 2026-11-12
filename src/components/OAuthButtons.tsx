@@ -6,13 +6,13 @@ import { authErrorMessage, isUserCancelled } from '../services/auth';
 type OAuthProvider = 'google' | 'github';
 
 interface OAuthButtonsProps {
-  /** 登录失败时回传给页面显示的讯息（用户关掉 popup 不会触发） */
+  /** 登入失敗時回傳給頁面顯示的訊息（使用者關掉 popup 不會觸發） */
   onError(message: string): void;
-  /** 登录成功后的回调（可选） */
+  /** 登入成功後的回撥（可選） */
   onSuccess?(): void;
-  /** 页面其他操作进行中时禁用 */
+  /** 頁面其他操作進行中時禁用 */
   disabled?: boolean;
-  /** 开始登录时通知页面（例如清除旧错误） */
+  /** 開始登入時通知頁面（例如清除舊錯誤） */
   onStart?(): void;
 }
 
@@ -61,11 +61,11 @@ export default function OAuthButtons({ onError, onSuccess, onStart, disabled = f
     <div className="stack oauth-buttons">
       <button type="button" className="btn btn-block" disabled={isDisabled} onClick={() => handle('google')}>
         <GoogleIcon />
-        {busy === 'google' ? '正在登录…' : '使用 Google 登录'}
+        {busy === 'google' ? '正在登入…' : '使用 Google 登入'}
       </button>
       <button type="button" className="btn btn-block" disabled={isDisabled} onClick={() => handle('github')}>
         <GithubIcon />
-        {busy === 'github' ? '正在登录…' : '使用 GitHub 登录'}
+        {busy === 'github' ? '正在登入…' : '使用 GitHub 登入'}
       </button>
     </div>
   );

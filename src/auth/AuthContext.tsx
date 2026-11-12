@@ -18,15 +18,15 @@ import { AccountExistsWithDifferentCredentialError } from '../services/auth';
 import { ensureUserProfile, subscribeUserProfile, updateOwnProfile } from '../services/users';
 
 export interface AuthContextValue {
-  /** Firebase Auth 用户；未登录为 null */
+  /** Firebase Auth 使用者；未登入為 null */
   user: User | null;
-  /** Firestore users/{uid}；读取中或不存在为 null */
+  /** Firestore users/{uid}；讀取中或不存在為 null */
   profile: UserProfile | null;
-  /** 首次判定登录状态 + 首次载入 profile 完成前为 true */
+  /** 首次判定登入狀態 + 首次載入 profile 完成前為 true */
   loading: boolean;
   isAdmin: boolean;
   isDisabled: boolean;
-  /** 有待绑定的凭证时为冲突的 email，页面可提示「请用原本方式登录以完成绑定」 */
+  /** 有待綁定的憑證時為衝突的 email，頁面可提示「請用原本方式登入以完成綁定」 */
   pendingLinkEmail: string | null;
   signInWithGoogle(): Promise<void>;
   signInWithGithub(): Promise<void>;
@@ -38,8 +38,8 @@ export interface AuthContextValue {
 
 export const AuthContext = createContext<AuthContextValue | null>(null);
 
-/** 冲突错误未带 email 时用于提示的占位文字 */
-const UNKNOWN_EMAIL = '该 email';
+/** 衝突錯誤未帶 email 時用於提示的佔位文字 */
+const UNKNOWN_EMAIL = '該 email';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -47,15 +47,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [pendingLinkEmail, setPendingLinkEmail] = useState<string | null>(null);
 
-  /** 待绑定的凭证（不放 state，避免触发渲染，也避免闭包拿到旧值） */
+  /** 待綁定的憑證（不放 state，避免觸發渲染，也避免閉包拿到舊值） */
   const pendingCredRef = useRef<AuthCredential | null>(null);
-  /** 当前 profile 订阅的退订函数 */
+  /** 當前 profile 訂閱的退訂函式 */
   const profileUnsubRef = useRef<Unsubscribe | null>(null);
-  /** 每次 auth 状态变化 / effect 清理时递增；异步回调对比世代，旧世代的结果一律丢弃 */
+  /** 每次 auth 狀態變化 / effect 清理時遞增；非同步回撥對比世代，舊世代的結果一律丟棄 */
   const generationRef = useRef(0);
   /**
-   * Email 注册时填的显示名称。createUserWithEmailAndPassword 会先触发 onAuthStateChanged，
-   * 此时 updateProfile 还没跑完，users 文档会以 displayName=null 建立；等 profile 快照到达后再补写。
+   * Email 註冊時填的顯示名稱。createUserWithEmailAndPassword 會先觸發 onAuthStateChanged，
+   * 此時 updateProfile 還沒跑完，users 文件會以 displayName=null 建立；等 profile 快照到達後再補寫。
    */
   const pendingDisplayNameRef = useRef<string | null>(null);
 
@@ -69,28 +69,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const isCurrent = () => generationRef.current === gen;
       let current = firebaseUser;
 
-      // 1. 有冲突时留下的凭证 → 先绑定到刚登录的账号（同步取出并清空，防止重复绑定）
+      // 1. 有衝突時留下的憑證 → 先綁定到剛登入的帳號（同步取出並清空，防止重複綁定）
       const cred = pendingCredRef.current;
       if (cred) {
         pendingCredRef.current = null;
         try {
           current = await authService.linkPendingCredential(firebaseUser, cred);
         } catch (err) {
-          console.error('[AuthContext] 绑定待处理凭证失败', err);
+          console.error('[AuthContext] 綁定待處理憑證失敗', err);
         }
         setPendingLinkEmail(null);
         if (!isCurrent()) return;
       }
 
-      // 2. 建立 / 同步 users/{uid}。失败（例如已停用账号被 rules 拒写）不阻断，仍订阅以读取 profile
+      // 2. 建立 / 同步 users/{uid}。失敗（例如已停用帳號被 rules 拒寫）不阻斷，仍訂閱以讀取 profile
       try {
         await ensureUserProfile(current);
       } catch (err) {
-        console.error('[AuthContext] ensureUserProfile 失败', err);
+        console.error('[AuthContext] ensureUserProfile 失敗', err);
       }
       if (!isCurrent()) return;
 
-      // 3. 订阅 profile；首次快照（或错误）到达时结束 loading
+      // 3. 訂閱 profile；首次快照（或錯誤）到達時結束 loading
       try {
         stopProfile();
         profileUnsubRef.current = subscribeUserProfile(
@@ -103,19 +103,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (p && pendingName && p.displayName == null && !p.disabled) {
               pendingDisplayNameRef.current = null;
               updateOwnProfile(current.uid, { displayName: pendingName }).catch((err) =>
-                console.error('[AuthContext] 补写显示名称失败', err),
+                console.error('[AuthContext] 補寫顯示名稱失敗', err),
               );
             }
           },
           (err) => {
             if (!isCurrent()) return;
-            console.error('[AuthContext] 订阅 profile 失败', err);
+            console.error('[AuthContext] 訂閱 profile 失敗', err);
             setProfile(null);
             setLoading(false);
           },
         );
       } catch (err) {
-        console.error('[AuthContext] subscribeUserProfile 失败', err);
+        console.error('[AuthContext] subscribeUserProfile 失敗', err);
         if (isCurrent()) setLoading(false);
       }
     };
@@ -140,7 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  /** 包装登录方法：捕获账号冲突 → 存凭证、记下 email，然后继续抛出给页面显示 */
+  /** 包裝登入方法：捕獲帳號衝突 → 存憑證、記下 email，然後繼續拋出給頁面顯示 */
   const withConflictCapture = useCallback(async (fn: () => Promise<unknown>): Promise<void> => {
     try {
       await fn();
@@ -219,6 +219,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth 必须在 <AuthProvider> 内使用');
+  if (!ctx) throw new Error('useAuth 必須在 <AuthProvider> 內使用');
   return ctx;
 }

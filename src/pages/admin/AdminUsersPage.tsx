@@ -9,12 +9,12 @@ type UserFilter = 'all' | 'admin' | 'user' | 'disabled';
 
 const FILTER_OPTIONS: { value: UserFilter; label: string }[] = [
   { value: 'all', label: '全部' },
-  { value: 'admin', label: '管理员' },
-  { value: 'user', label: '普通用户' },
+  { value: 'admin', label: '管理員' },
+  { value: 'user', label: '一般使用者' },
   { value: 'disabled', label: '已停用' },
 ];
 
-const SELF_HINT = '不能修改自己的角色或状态';
+const SELF_HINT = '不能修改自己的角色或狀態';
 
 function errorCode(err: unknown): string | undefined {
   if (err && typeof err === 'object' && 'code' in err) {
@@ -26,21 +26,21 @@ function errorCode(err: unknown): string | undefined {
 
 function describeLoadError(err: unknown): string {
   const code = errorCode(err);
-  if (code === 'permission-denied' || code === 'firestore/permission-denied') return '没有权限读取用户列表';
-  if (code === 'unavailable') return '无法连接服务器，请检查网络后重试';
-  return `读取用户列表失败：${err instanceof Error ? err.message : String(err)}`;
+  if (code === 'permission-denied' || code === 'firestore/permission-denied') return '沒有權限讀取使用者列表';
+  if (code === 'unavailable') return '無法連線伺服器，請檢查網路後重試';
+  return `讀取使用者列表失敗：${err instanceof Error ? err.message : String(err)}`;
 }
 
 function describeActionError(err: unknown): string {
   const code = errorCode(err);
-  if (code === 'permission-denied' || code === 'firestore/permission-denied') return '操作失败：没有权限';
-  return `操作失败：${err instanceof Error ? err.message : String(err)}`;
+  if (code === 'permission-denied' || code === 'firestore/permission-denied') return '操作失敗：沒有權限';
+  return `操作失敗：${err instanceof Error ? err.message : String(err)}`;
 }
 
 function formatTime(ts: UserProfile['createdAt']): string {
   if (!ts) return '—';
   try {
-    return ts.toDate().toLocaleString('zh-CN');
+    return ts.toDate().toLocaleString('zh-TW');
   } catch {
     return '—';
   }
@@ -121,7 +121,7 @@ export default function AdminUsersPage() {
   function handleRoleChange(u: UserProfile, role: Role) {
     if (u.uid === selfUid || role === u.role) return;
     const name = u.displayName || u.email || u.uid;
-    if (u.role === 'admin' && role === 'user' && !window.confirm(`确定要将「${name}」降级为普通用户吗？`)) return;
+    if (u.role === 'admin' && role === 'user' && !window.confirm(`確定要將「${name}」降級為一般使用者嗎？`)) return;
     void runAction(u.uid, () => setUserRole(u.uid, role));
   }
 
@@ -129,21 +129,21 @@ export default function AdminUsersPage() {
     if (u.uid === selfUid) return;
     const name = u.displayName || u.email || u.uid;
     const next = !u.disabled;
-    if (next && !window.confirm(`确定要停用「${name}」吗？停用后该用户将无法使用需登录的页面。`)) return;
+    if (next && !window.confirm(`確定要停用「${name}」嗎？停用後該使用者將無法使用需登入的頁面。`)) return;
     void runAction(u.uid, () => setUserDisabled(u.uid, next));
   }
 
   return (
     <div className="container admin-users">
-      <h1>用户管理</h1>
+      <h1>使用者管理</h1>
 
       <div className="admin-stats">
         <div className="card admin-stat">
-          <div className="admin-stat-label muted">总人数</div>
+          <div className="admin-stat-label muted">總人數</div>
           <div className="admin-stat-value" data-testid="stat-total">{stats.total}</div>
         </div>
         <div className="card admin-stat">
-          <div className="admin-stat-label muted">管理员</div>
+          <div className="admin-stat-label muted">管理員</div>
           <div className="admin-stat-value" data-testid="stat-admins">{stats.admins}</div>
         </div>
         <div className="card admin-stat">
@@ -154,17 +154,17 @@ export default function AdminUsersPage() {
 
       <div className="admin-toolbar">
         <div className="field admin-search">
-          <label htmlFor="admin-user-search">搜索</label>
+          <label htmlFor="admin-user-search">搜尋</label>
           <input
             id="admin-user-search"
             type="search"
-            placeholder="按邮箱或名称搜索"
+            placeholder="以電子郵件或名稱搜尋"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
         </div>
         <div className="field">
-          <label htmlFor="admin-user-filter">筛选</label>
+          <label htmlFor="admin-user-filter">篩選</label>
           <select id="admin-user-filter" value={filter} onChange={(e) => setFilter(e.target.value as UserFilter)}>
             {FILTER_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
@@ -180,26 +180,26 @@ export default function AdminUsersPage() {
       )}
 
       {loading ? (
-        <div className="spinner-page">载入中…</div>
+        <div className="spinner-page">載入中…</div>
       ) : loadError ? (
         <div className="alert alert-error" role="alert">{loadError}</div>
       ) : users.length === 0 ? (
-        <div className="card center muted">目前还没有任何用户</div>
+        <div className="card center muted">目前還沒有任何使用者</div>
       ) : visible.length === 0 ? (
-        <div className="card center muted">没有符合条件的用户</div>
+        <div className="card center muted">沒有符合條件的使用者</div>
       ) : (
         <div className="card admin-table-card">
           <div className="table-wrap">
             <table className="table">
               <thead>
                 <tr>
-                  <th>用户</th>
-                  <th>邮箱</th>
-                  <th>登录方式</th>
+                  <th>使用者</th>
+                  <th>電子郵件</th>
+                  <th>登入方式</th>
                   <th>角色</th>
-                  <th>状态</th>
-                  <th>建立时间</th>
-                  <th>最后登录</th>
+                  <th>狀態</th>
+                  <th>建立時間</th>
+                  <th>最後登入</th>
                   <th>操作</th>
                 </tr>
               </thead>
@@ -240,9 +240,9 @@ export default function AdminUsersPage() {
                       </td>
                       <td>
                         {u.role === 'admin' ? (
-                          <span className="badge badge-admin">管理员</span>
+                          <span className="badge badge-admin">管理員</span>
                         ) : (
-                          <span className="badge">普通用户</span>
+                          <span className="badge">一般使用者</span>
                         )}
                       </td>
                       <td>
@@ -264,8 +264,8 @@ export default function AdminUsersPage() {
                             title={isSelf ? SELF_HINT : undefined}
                             onChange={(e) => handleRoleChange(u, e.target.value as Role)}
                           >
-                            <option value="admin">管理员</option>
-                            <option value="user">普通用户</option>
+                            <option value="admin">管理員</option>
+                            <option value="user">一般使用者</option>
                           </select>
                           <button
                             type="button"
@@ -274,7 +274,7 @@ export default function AdminUsersPage() {
                             title={isSelf ? SELF_HINT : undefined}
                             onClick={() => handleToggleDisabled(u)}
                           >
-                            {u.disabled ? '启用' : '停用'}
+                            {u.disabled ? '啟用' : '停用'}
                           </button>
                         </div>
                       </td>
@@ -285,7 +285,7 @@ export default function AdminUsersPage() {
             </table>
           </div>
           {visible.length !== users.length && (
-            <div className="muted admin-count">显示 {visible.length} / {users.length} 位用户</div>
+            <div className="muted admin-count">顯示 {visible.length} / {users.length} 位使用者</div>
           )}
         </div>
       )}

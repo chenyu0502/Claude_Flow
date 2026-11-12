@@ -8,7 +8,7 @@ export default function HomePage() {
   const { user, profile, loading, isAdmin } = useAuth();
 
   if (loading) {
-    return <div className="spinner-page">载入中…</div>;
+    return <div className="spinner-page">載入中…</div>;
   }
 
   if (!user) {
@@ -16,13 +16,13 @@ export default function HomePage() {
       <div className="container">
         <div className="card center home-hero">
           <h1>Claude Flow</h1>
-          <p className="muted">支持 Google、GitHub 与 Email/密码登录的账号系统，可管理个人资料与登录方式。</p>
+          <p className="muted">支援 Google、GitHub 與 Email/密碼登入的帳號系統，可管理個人資料與登入方式。</p>
           <div className="row home-actions">
             <Link to="/login" className="btn btn-primary">
-              登录
+              登入
             </Link>
             <Link to="/register" className="btn">
-              注册
+              註冊
             </Link>
           </div>
         </div>
@@ -30,26 +30,26 @@ export default function HomePage() {
     );
   }
 
-  const name = profile?.displayName ?? user.displayName ?? user.email ?? '用户';
+  const name = profile?.displayName ?? user.displayName ?? user.email ?? '使用者';
 
   return (
     <div className="container stack">
       <div className="card stack">
-        <h1>欢迎，{name}</h1>
+        <h1>歡迎，{name}</h1>
         <div className="row">
-          <span className={isAdmin ? 'badge badge-admin' : 'badge'}>{isAdmin ? '管理员' : '一般用户'}</span>
-          <span className="muted">最后登录：{formatTimestamp(profile?.lastLoginAt ?? null)}</span>
+          <span className={isAdmin ? 'badge badge-admin' : 'badge'}>{isAdmin ? '管理員' : '一般使用者'}</span>
+          <span className="muted">最後登入：{formatTimestamp(profile?.lastLoginAt ?? null)}</span>
         </div>
         <div className="row">
           <Link to="/profile" className="btn">
-            个人资料
+            個人資料
           </Link>
         </div>
       </div>
       {isAdmin && (
         <Link to="/admin/users" className="card home-link-card">
-          <h2>用户管理</h2>
-          <p className="muted">查看所有用户、调整角色与停用账号 →</p>
+          <h2>使用者管理</h2>
+          <p className="muted">檢視所有使用者、調整角色與停用帳號 →</p>
         </Link>
       )}
     </div>

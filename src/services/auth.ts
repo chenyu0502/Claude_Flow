@@ -1,4 +1,4 @@
-// OWNER: Agent A。只负责 Firebase Auth 操作，不碰 Firestore（用户文档由 AuthContext 调 users.ts 处理）。
+// OWNER: Agent A。只負責 Firebase Auth 操作，不碰 Firestore（使用者文件由 AuthContext 調 users.ts 處理）。
 import {
   GithubAuthProvider,
   GoogleAuthProvider,
@@ -17,8 +17,8 @@ import { auth } from '../lib/firebase';
 import type { ProviderId } from '../types/user';
 
 /**
- * 同一 email 已用其他登录方式注册时抛出（auth/account-exists-with-different-credential）。
- * pendingCredential 留着，等用户用原本方式登录后再 linkPendingCredential 绑定。
+ * 同一 email 已用其他登入方式註冊時拋出（auth/account-exists-with-different-credential）。
+ * pendingCredential 留著，等使用者用原本方式登入後再 linkPendingCredential 綁定。
  */
 export class AccountExistsWithDifferentCredentialError extends Error {
   constructor(
@@ -43,7 +43,7 @@ function createProvider(providerId: OAuthProviderId): AuthProvider {
   return provider;
 }
 
-/** 取出 FirebaseError 的 code（鸭子类型判断，不依赖 instanceof） */
+/** 取出 FirebaseError 的 code（鴨子型別判斷，不依賴 instanceof） */
 export function getAuthErrorCode(err: unknown): string | null {
   if (typeof err === 'object' && err !== null && 'code' in err) {
     const code = (err as { code: unknown }).code;
@@ -52,7 +52,7 @@ export function getAuthErrorCode(err: unknown): string | null {
   return null;
 }
 
-/** 弹窗被用户关闭或被新的弹窗请求取代：视为用户主动取消，页面不必显示错误 */
+/** 彈窗被使用者關閉或被新的彈窗請求取代：視為使用者主動取消，頁面不必顯示錯誤 */
 export function isUserCancelled(err: unknown): boolean {
   const code = getAuthErrorCode(err);
   return code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request';
@@ -88,7 +88,7 @@ export async function signInWithEmail(email: string, password: string): Promise<
   const result = await signInWithEmailAndPassword(auth, email, password);
   return result.user;
 }
-/** 注册后同时设置 Auth 的 displayName */
+/** 註冊後同時設定 Auth 的 displayName */
 export async function signUpWithEmail(email: string, password: string, displayName: string): Promise<User> {
   const result = await createUserWithEmailAndPassword(auth, email, password);
   await updateProfile(result.user, { displayName });
@@ -101,54 +101,54 @@ export async function sendResetEmail(email: string): Promise<void> {
 export async function signOutUser(): Promise<void> {
   await signOut(auth);
 }
-/** 把先前因 email 冲突保留下来的凭证绑定到当前用户 */
+/** 把先前因 email 衝突保留下來的憑證綁定到當前使用者 */
 export async function linkPendingCredential(user: User, credential: AuthCredential): Promise<User> {
   const result = await linkWithCredential(user, credential);
   return result.user;
 }
-/** 个人资料页：为当前用户再绑定 Google / GitHub（popup） */
+/** 個人資料頁：為當前使用者再綁定 Google / GitHub（popup） */
 export async function linkProvider(providerId: Exclude<ProviderId, 'password'>): Promise<User> {
   const user = auth.currentUser;
-  if (!user) throw new Error('请先登录');
+  if (!user) throw new Error('請先登入');
   const result = await linkWithPopup(user, createProvider(providerId));
   return result.user;
 }
-/** 个人资料页：解除绑定。只剩一种登录方式时必须拒绝（抛错）。 */
+/** 個人資料頁：解除綁定。只剩一種登入方式時必須拒絕（拋錯）。 */
 export async function unlinkProvider(providerId: ProviderId): Promise<User> {
   const user = auth.currentUser;
-  if (!user) throw new Error('请先登录');
-  if (user.providerData.length <= 1) throw new Error('至少需要保留一种登录方式');
+  if (!user) throw new Error('請先登入');
+  if (user.providerData.length <= 1) throw new Error('至少需要保留一種登入方式');
   if (!user.providerData.some((p) => p.providerId === providerId)) {
-    throw new Error('尚未绑定此登录方式');
+    throw new Error('尚未綁定此登入方式');
   }
   return unlink(user, providerId);
 }
 
 const ERROR_MESSAGES: Record<string, string> = {
-  'auth/invalid-email': 'Email 格式不正确',
-  'auth/user-disabled': '此账号已被停用',
-  'auth/user-not-found': 'Email 或密码错误',
-  'auth/wrong-password': 'Email 或密码错误',
-  'auth/invalid-credential': 'Email 或密码错误，或登录凭证已失效',
-  'auth/email-already-in-use': '此 Email 已被注册',
-  'auth/weak-password': '密码强度不足，至少需要 6 个字符',
-  'auth/too-many-requests': '尝试次数过多，请稍后再试',
-  'auth/popup-closed-by-user': '登录窗口已关闭',
-  'auth/cancelled-popup-request': '登录已取消',
-  'auth/popup-blocked': '登录弹窗被浏览器拦截，请允许弹出窗口后重试',
-  'auth/network-request-failed': '网络连接失败，请检查网络后重试',
-  'auth/credential-already-in-use': '此登录方式已绑定到另一个账号',
-  'auth/provider-already-linked': '已绑定过此登录方式',
-  'auth/requires-recent-login': '为了安全，请重新登录后再执行此操作',
-  'auth/operation-not-allowed': '此登录方式尚未启用，请在 Firebase Console 的 Authentication 中启用',
+  'auth/invalid-email': 'Email 格式不正確',
+  'auth/user-disabled': '此帳號已被停用',
+  'auth/user-not-found': 'Email 或密碼錯誤',
+  'auth/wrong-password': 'Email 或密碼錯誤',
+  'auth/invalid-credential': 'Email 或密碼錯誤，或登入憑證已失效',
+  'auth/email-already-in-use': '此 Email 已被註冊',
+  'auth/weak-password': '密碼強度不足，至少需要 6 個字元',
+  'auth/too-many-requests': '嘗試次數過多，請稍後再試',
+  'auth/popup-closed-by-user': '登入視窗已關閉',
+  'auth/cancelled-popup-request': '登入已取消',
+  'auth/popup-blocked': '登入彈出視窗被瀏覽器攔截，請允許彈出視窗後重試',
+  'auth/network-request-failed': '網路連線失敗，請檢查網路後重試',
+  'auth/credential-already-in-use': '此登入方式已綁定到另一個帳號',
+  'auth/provider-already-linked': '已綁定過此登入方式',
+  'auth/requires-recent-login': '為了安全，請重新登入後再執行此操作',
+  'auth/operation-not-allowed': '此登入方式尚未啟用，請在 Firebase Console 的 Authentication 中啟用',
 };
 
-const DEFAULT_ERROR_MESSAGE = '发生未知错误，请稍后再试';
+const DEFAULT_ERROR_MESSAGE = '發生未知錯誤，請稍後再試';
 
-/** 把任何错误转成给用户看的简体中文讯息 */
+/** 把任何錯誤轉成給使用者看的簡體中文訊息 */
 export function authErrorMessage(err: unknown): string {
   if (err instanceof AccountExistsWithDifferentCredentialError) {
-    return '此 email 已用其他方式注册，请先用原本的方式登录，完成后会自动绑定';
+    return '此 email 已用其他方式註冊，請先用原本的方式登入，完成後會自動綁定';
   }
   const code = getAuthErrorCode(err);
   if (code !== null) return ERROR_MESSAGES[code] ?? DEFAULT_ERROR_MESSAGE;

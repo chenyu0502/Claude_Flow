@@ -1,4 +1,4 @@
-/* OWNER: Agent F — 管理员后台专属样式 */
+/* OWNER: Agent F — 管理員後台專屬樣式 */
 .admin-users { min-width: 0; }
 
 .admin-stats {
@@ -22,7 +22,7 @@
 
 .admin-alert { margin-bottom: 16px; }
 
-/* 表格卡片：卡片本身不溢出，内部 .table-wrap 横向卷动 */
+/* 表格卡片：卡片本身不溢位，內部 .table-wrap 橫向捲動 */
 .admin-table-card { padding: 0; overflow: hidden; max-width: 100%; }
 .admin-table-card .table-wrap { -webkit-overflow-scrolling: touch; }
 .admin-count { padding: 8px 12px; font-size: 0.85rem; }

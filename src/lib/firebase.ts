@@ -4,7 +4,7 @@ import { connectFirestoreEmulator, getFirestore } from 'firebase/firestore';
 
 const env = import.meta.env;
 
-/** true 时连接本地 Firebase Emulator（Auth :9099、Firestore :8080），不需要真实项目 */
+/** true 時連線本地 Firebase Emulator（Auth :9099、Firestore :8080），不需要真實專案 */
 export const useEmulator = env.VITE_USE_EMULATOR === 'true';
 
 const firebaseConfig = {

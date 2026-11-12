@@ -39,7 +39,7 @@ const svc = vi.mocked(authService);
 const users = vi.mocked(usersService);
 
 type ProfileCb = (p: UserProfile | null) => void;
-/** uid → 最近一次订阅的回调与退订函数 */
+/** uid → 最近一次訂閱的回撥與退訂函式 */
 let subs: Record<string, { onData: ProfileCb; onError?: (e: Error) => void; unsub: ReturnType<typeof vi.fn> }>;
 
 const makeUser = (uid: string) => ({ uid } as User);
@@ -96,7 +96,7 @@ beforeEach(() => {
 });
 
 describe('AuthProvider', () => {
-  it('首次判定未登录 → loading=false', async () => {
+  it('首次判定未登入 → loading=false', async () => {
     setup();
     expect(text('loading')).toBe('true');
     await emitAuth(null);
@@ -104,7 +104,7 @@ describe('AuthProvider', () => {
     expect(text('uid')).toBe('none');
   });
 
-  it('登录后等首次 profile 快照才结束 loading，并计算 isAdmin / isDisabled', async () => {
+  it('登入後等首次 profile 快照才結束 loading，並計算 isAdmin / isDisabled', async () => {
     setup();
     const u = makeUser('a');
     await emitAuth(u);
@@ -124,7 +124,7 @@ describe('AuthProvider', () => {
     expect(ctx.isDisabled).toBe(true);
   });
 
-  it('ensureUserProfile 失败：记 console.error，仍订阅并结束 loading', async () => {
+  it('ensureUserProfile 失敗：記 console.error，仍訂閱並結束 loading', async () => {
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     users.ensureUserProfile.mockRejectedValue(new Error('permission-denied'));
     setup();
@@ -137,7 +137,7 @@ describe('AuthProvider', () => {
     errSpy.mockRestore();
   });
 
-  it('profile 订阅出错也结束 loading', async () => {
+  it('profile 訂閱出錯也結束 loading', async () => {
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     setup();
     await emitAuth(makeUser('a'));
@@ -148,7 +148,7 @@ describe('AuthProvider', () => {
     errSpy.mockRestore();
   });
 
-  it('登出时退订 profile', async () => {
+  it('登出時退訂 profile', async () => {
     setup();
     await emitAuth(makeUser('a'));
     await waitFor(() => expect(users.subscribeUserProfile).toHaveBeenCalled());
@@ -159,7 +159,7 @@ describe('AuthProvider', () => {
     expect(text('loading')).toBe('false');
   });
 
-  it('快速切换用户：旧用户迟到的结果不覆盖新用户', async () => {
+  it('快速切換使用者：舊使用者遲到的結果不覆蓋新使用者', async () => {
     let resolveA!: () => void;
     users.ensureUserProfile.mockImplementation((u: User) =>
       u.uid === 'a' ? new Promise<void>((r) => (resolveA = r)) : Promise.resolve(),
@@ -171,12 +171,12 @@ describe('AuthProvider', () => {
     act(() => subs.b.onData(makeProfile('b')));
 
     await act(async () => resolveA());
-    expect(subs.a).toBeUndefined(); // 旧世代不再订阅
+    expect(subs.a).toBeUndefined(); // 舊世代不再訂閱
     expect(text('uid')).toBe('b');
     expect(text('profile')).toBe('b');
   });
 
-  it('卸载时退订 auth 与 profile', async () => {
+  it('解除安裝時退訂 auth 與 profile', async () => {
     const { unmount } = render(
       <AuthProvider>
         <Probe />
@@ -190,10 +190,10 @@ describe('AuthProvider', () => {
   });
 });
 
-describe('账号冲突 pending link 流程', () => {
+describe('帳號衝突 pending link 流程', () => {
   const cred = { providerId: 'github.com' } as AuthCredential;
 
-  it('冲突 → 存 pending 并继续抛出；用原方式登录后自动绑定并清掉 pending', async () => {
+  it('衝突 → 存 pending 並繼續拋出；用原方式登入後自動綁定並清掉 pending', async () => {
     svc.signInWithGithub.mockRejectedValue(new AccountExistsWithDifferentCredentialError('x@y.com', cred));
     setup();
     await emitAuth(null);
@@ -214,14 +214,14 @@ describe('账号冲突 pending link 流程', () => {
     expect(users.ensureUserProfile).toHaveBeenCalledWith(linked);
     expect(text('pending')).toBe('none');
 
-    // 凭证只绑定一次
+    // 憑證只綁定一次
     await emitAuth(null);
     await emitAuth(makeUser('a'));
     await waitFor(() => expect(users.subscribeUserProfile).toHaveBeenCalledTimes(2));
     expect(svc.linkPendingCredential).toHaveBeenCalledTimes(1);
   });
 
-  it('绑定失败：记错误、清掉 pending、仍继续载入 profile', async () => {
+  it('綁定失敗：記錯誤、清掉 pending、仍繼續載入 profile', async () => {
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     svc.signInWithGoogle.mockRejectedValue(new AccountExistsWithDifferentCredentialError(null, cred));
     setup();
@@ -229,7 +229,7 @@ describe('账号冲突 pending link 流程', () => {
     await act(async () => {
       await ctx.signInWithGoogle().catch(() => {});
     });
-    expect(text('pending')).not.toBe('none'); // email 为 null 时用占位文字
+    expect(text('pending')).not.toBe('none'); // email 為 null 時用佔位文字
 
     svc.linkPendingCredential.mockRejectedValue(new Error('auth/credential-already-in-use'));
     await emitAuth(makeUser('a'));
@@ -239,7 +239,7 @@ describe('账号冲突 pending link 流程', () => {
     errSpy.mockRestore();
   });
 
-  it('signOut 清掉 pending，之后登录不再绑定', async () => {
+  it('signOut 清掉 pending，之後登入不再綁定', async () => {
     svc.signInWithEmail.mockRejectedValue(new AccountExistsWithDifferentCredentialError('x@y.com', cred));
     setup();
     await emitAuth(null);
@@ -259,7 +259,7 @@ describe('账号冲突 pending link 流程', () => {
     expect(svc.linkPendingCredential).not.toHaveBeenCalled();
   });
 
-  it('非冲突错误不设置 pending，原样抛出', async () => {
+  it('非衝突錯誤不設定 pending，原樣拋出', async () => {
     const err = new Error('auth/wrong-password');
     svc.signInWithEmail.mockRejectedValue(err);
     setup();

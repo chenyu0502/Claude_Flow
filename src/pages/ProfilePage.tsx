@@ -14,19 +14,19 @@ export const DISPLAY_NAME_MAX = 50;
 export function formatTimestamp(ts: Timestamp | null | undefined): string {
   if (!ts) return '—';
   try {
-    return ts.toDate().toLocaleString('zh-CN');
+    return ts.toDate().toLocaleString('zh-TW');
   } catch {
     return '—';
   }
 }
 
-/** 返回错误讯息；通过时返回 null */
+/** 返回錯誤訊息；透過時返回 null */
 export function validateProfile(displayName: string, photoURL: string): string | null {
   const name = displayName.trim();
-  if (!name) return '显示名称不能为空';
-  if (name.length > DISPLAY_NAME_MAX) return `显示名称不能超过 ${DISPLAY_NAME_MAX} 个字`;
+  if (!name) return '顯示名稱不能為空';
+  if (name.length > DISPLAY_NAME_MAX) return `顯示名稱不能超過 ${DISPLAY_NAME_MAX} 個字`;
   const url = photoURL.trim();
-  if (url && !url.startsWith('https://')) return '头像网址必须以 https:// 开头';
+  if (url && !url.startsWith('https://')) return '頭像網址必須以 https:// 開頭';
   return null;
 }
 
@@ -46,7 +46,7 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<Msg>(null);
 
-  // providers 以 Firebase Auth 的 providerData 为准；link/unlink 后 user 对象引用不变，所以另存一份触发重绘
+  // providers 以 Firebase Auth 的 providerData 為準；link/unlink 後 user 物件引用不變，所以另存一份觸發重繪
   const [linked, setLinked] = useState<ProviderId[]>(() => linkedProviders(user?.providerData));
   const [busyProvider, setBusyProvider] = useState<ProviderId | null>(null);
   const [providerMsg, setProviderMsg] = useState<Msg>(null);
@@ -55,7 +55,7 @@ export default function ProfilePage() {
     setLinked(linkedProviders(user?.providerData));
   }, [user]);
 
-  // profile 首次到达时填入表单（之后不覆盖用户正在编辑的内容）
+  // profile 首次到達時填入表單（之後不覆蓋使用者正在編輯的內容）
   useEffect(() => {
     if (initialized || !profile) return;
     setDisplayName(profile.displayName ?? '');
@@ -63,8 +63,8 @@ export default function ProfilePage() {
     setInitialized(true);
   }, [profile, initialized]);
 
-  if (!user) return null; // RequireAuth 已把关
-  if (!profile) return <div className="spinner-page">载入中…</div>;
+  if (!user) return null; // RequireAuth 已把關
+  if (!profile) return <div className="spinner-page">載入中…</div>;
 
   const uid = user.uid;
 
@@ -80,7 +80,7 @@ export default function ProfilePage() {
     try {
       const url = photoURL.trim();
       await updateOwnProfile(uid, { displayName: displayName.trim(), photoURL: url || null });
-      setSaveMsg({ kind: 'success', text: '已保存' });
+      setSaveMsg({ kind: 'success', text: '已儲存' });
     } catch (saveErr) {
       setSaveMsg({ kind: 'error', text: authErrorMessage(saveErr) });
     } finally {
@@ -112,7 +112,7 @@ export default function ProfilePage() {
   }
 
   const handleLink = (id: Exclude<ProviderId, 'password'>) =>
-    runProviderAction(id, () => linkProvider(id), `已绑定 ${PROVIDER_LABELS[id]}`);
+    runProviderAction(id, () => linkProvider(id), `已綁定 ${PROVIDER_LABELS[id]}`);
   const handleUnlink = (id: ProviderId) =>
     runProviderAction(id, () => unlinkProvider(id), `已解除 ${PROVIDER_LABELS[id]}`);
 
@@ -125,38 +125,38 @@ export default function ProfilePage() {
         <div className="profile-header">
           <Avatar name={headerName} photoURL={profile.photoURL} large />
           <div className="profile-header-info">
-            <h1>{profile.displayName || '未命名用户'}</h1>
+            <h1>{profile.displayName || '未命名使用者'}</h1>
             <div className="row">
               <span className="muted profile-email">{profile.email ?? user.email ?? '—'}</span>
-              <span className={isAdmin ? 'badge badge-admin' : 'badge'}>{isAdmin ? '管理员' : '一般用户'}</span>
+              <span className={isAdmin ? 'badge badge-admin' : 'badge'}>{isAdmin ? '管理員' : '一般使用者'}</span>
               {profile.disabled && <span className="badge badge-danger">已停用</span>}
             </div>
           </div>
         </div>
         <dl className="profile-meta">
-          <dt>建立时间</dt>
+          <dt>建立時間</dt>
           <dd>{formatTimestamp(profile.createdAt)}</dd>
-          <dt>最后登录</dt>
+          <dt>最後登入</dt>
           <dd>{formatTimestamp(profile.lastLoginAt)}</dd>
         </dl>
       </section>
 
       <section className="card">
-        <h2>编辑资料</h2>
+        <h2>編輯資料</h2>
         <form className="stack" onSubmit={handleSave} noValidate>
           <div className="field">
-            <label htmlFor="displayName">显示名称</label>
+            <label htmlFor="displayName">顯示名稱</label>
             <input id="displayName" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
             <span className="field-hint">
               {displayName.trim().length}/{DISPLAY_NAME_MAX}
             </span>
           </div>
           <div className="field">
-            <label htmlFor="photoURL">头像网址</label>
+            <label htmlFor="photoURL">頭像網址</label>
             <input
               id="photoURL"
               type="url"
-              placeholder="https://…（留空则显示首字母）"
+              placeholder="https://…（留空則顯示首字母）"
               value={photoURL}
               onChange={(e) => setPhotoURL(e.target.value)}
             />
@@ -168,14 +168,14 @@ export default function ProfilePage() {
           )}
           <div className="row">
             <button type="submit" className="btn btn-primary" disabled={saving}>
-              {saving ? '保存中…' : '保存'}
+              {saving ? '儲存中…' : '儲存'}
             </button>
           </div>
         </form>
       </section>
 
       <section className="card stack">
-        <h2>登录方式</h2>
+        <h2>登入方式</h2>
         <ul className="provider-list">
           {SUPPORTED_PROVIDERS.map((id) => {
             const isLinked = linked.includes(id);
@@ -185,19 +185,19 @@ export default function ProfilePage() {
                 <span className="row">
                   {isLinked ? (
                     <>
-                      <span className="badge">已绑定</span>
+                      <span className="badge">已綁定</span>
                       <button
                         type="button"
                         className="btn btn-sm btn-danger"
                         disabled={onlyOne || busyProvider !== null}
-                        title={onlyOne ? '至少需要保留一种登录方式' : undefined}
+                        title={onlyOne ? '至少需要保留一種登入方式' : undefined}
                         onClick={() => handleUnlink(id)}
                       >
                         解除
                       </button>
                     </>
                   ) : id === 'password' ? (
-                    <span className="muted">未设置</span>
+                    <span className="muted">未設定</span>
                   ) : (
                     <button
                       type="button"
@@ -205,7 +205,7 @@ export default function ProfilePage() {
                       disabled={busyProvider !== null}
                       onClick={() => handleLink(id)}
                     >
-                      绑定
+                      綁定
                     </button>
                   )}
                 </span>
@@ -213,7 +213,7 @@ export default function ProfilePage() {
             );
           })}
         </ul>
-        {onlyOne && <p className="field-hint">只剩一种登录方式，无法解除；请先绑定其他登录方式。</p>}
+        {onlyOne && <p className="field-hint">只剩一種登入方式，無法解除；請先綁定其他登入方式。</p>}
         {providerMsg && (
           <div className={`alert alert-${providerMsg.kind}`} role={providerMsg.kind === 'error' ? 'alert' : 'status'}>
             {providerMsg.text}

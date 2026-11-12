@@ -1,4 +1,4 @@
-// OWNER: Agent B。users/{uid} 的所有 Firestore 读写都只经过这里。
+// OWNER: Agent B。users/{uid} 的所有 Firestore 讀寫都只經過這裡。
 import type { User } from 'firebase/auth';
 import {
   collection,
@@ -20,14 +20,14 @@ import { SUPPORTED_PROVIDERS } from '../types/user';
 
 const USERS = 'users';
 
-/** 与 firestore.rules 一致的 displayName 长度上限 */
+/** 與 firestore.rules 一致的 displayName 長度上限 */
 export const DISPLAY_NAME_MAX_LENGTH = 50;
 
 function userRef(uid: string) {
   return doc(db, USERS, uid);
 }
 
-/** 从 Auth 的 providerData 取出支持的登录方式（去重） */
+/** 從 Auth 的 providerData 取出支援的登入方式（去重） */
 export function providersOf(user: Pick<User, 'providerData'>): ProviderId[] {
   const ids = (user.providerData ?? [])
     .map((p) => p?.providerId)
@@ -43,7 +43,7 @@ function asTimestampOrNull(v: unknown): Timestamp | null {
   return v instanceof Timestamp ? v : null;
 }
 
-/** Firestore 文档数据 → UserProfile；缺字段或类型不对时给安全默认值（role='user'、disabled=false） */
+/** Firestore 文件資料 → UserProfile；缺欄位或型別不對時給安全預設值（role='user'、disabled=false） */
 export function toUserProfile(id: string, data: DocumentData | undefined): UserProfile {
   const d = data ?? {};
   const providers = Array.isArray(d.providers)
@@ -69,17 +69,17 @@ function toError(err: unknown): Error {
 }
 
 /**
- * 每次登录后由 AuthContext 调用。
- * 文档不存在：建立（role='user', disabled=false, createdAt/lastLoginAt=serverTimestamp()）。
- * 文档存在：只更新 email / providers / lastLoginAt（绝不覆盖 role、disabled，也不覆盖用户自己改过的 displayName/photoURL）。
- * 已停用的账号：rules 禁止本人写入，所以直接跳过更新（仍可读，前端据此显示停用提示）。
+ * 每次登入後由 AuthContext 呼叫。
+ * 文件不存在：建立（role='user', disabled=false, createdAt/lastLoginAt=serverTimestamp()）。
+ * 文件存在：只更新 email / providers / lastLoginAt（絕不覆蓋 role、disabled，也不覆蓋使用者自己改過的 displayName/photoURL）。
+ * 已停用的帳號：rules 禁止本人寫入，所以直接跳過更新（仍可讀，前端據此顯示停用提示）。
  */
 export async function ensureUserProfile(user: User): Promise<void> {
   const ref = userRef(user.uid);
   const snap = await getDoc(ref);
   const providers = providersOf(user);
   const displayName = user.displayName ? user.displayName.slice(0, DISPLAY_NAME_MAX_LENGTH) : null;
-  // rules 限制 photoURL ≤ 2048 字，超长的直接不存，避免整个建档被拒
+  // rules 限制 photoURL ≤ 2048 字，超長的直接不存，避免整個建檔被拒
   const photoURL = user.photoURL && user.photoURL.length <= 2048 ? user.photoURL : null;
 
   if (!snap.exists()) {
@@ -129,7 +129,7 @@ export async function updateOwnProfile(uid: string, fields: Partial<EditableProf
   if ('displayName' in fields) {
     const name = fields.displayName;
     if (name != null && name.length > DISPLAY_NAME_MAX_LENGTH) {
-      throw new Error(`显示名称不能超过 ${DISPLAY_NAME_MAX_LENGTH} 个字`);
+      throw new Error(`顯示名稱不能超過 ${DISPLAY_NAME_MAX_LENGTH} 個字`);
     }
     patch.displayName = name ?? null;
   }
@@ -140,7 +140,7 @@ export async function updateOwnProfile(uid: string, fields: Partial<EditableProf
   await updateDoc(userRef(uid), patch);
 }
 
-/** 仅 admin 可用（由 Security Rules 把关），按 createdAt 新到旧 */
+/** 僅 admin 可用（由 Security Rules 把關），按 createdAt 新到舊 */
 export function subscribeAllUsers(
   onData: (users: UserProfile[]) => void,
   onError?: (err: Error) => void,

@@ -46,40 +46,40 @@ function renderNav() {
 }
 
 describe('NavBar', () => {
-  it('未登录显示登录/注册', () => {
+  it('未登入顯示登入/註冊', () => {
     mockUseAuth.mockReturnValue(base());
     renderNav();
     expect(screen.getByRole('link', { name: 'Claude Flow' })).toHaveAttribute('href', '/');
-    expect(screen.getByRole('link', { name: '登录' })).toHaveAttribute('href', '/login');
-    expect(screen.getByRole('link', { name: '注册' })).toHaveAttribute('href', '/register');
-    expect(screen.queryByText('个人资料')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '登入' })).toHaveAttribute('href', '/login');
+    expect(screen.getByRole('link', { name: '註冊' })).toHaveAttribute('href', '/register');
+    expect(screen.queryByText('個人資料')).not.toBeInTheDocument();
   });
 
-  it('loading 时右侧留空', () => {
+  it('loading 時右側留空', () => {
     mockUseAuth.mockReturnValue(base({ loading: true }));
     renderNav();
-    expect(screen.queryByText('登录')).not.toBeInTheDocument();
+    expect(screen.queryByText('登入')).not.toBeInTheDocument();
     expect(screen.queryByText('登出')).not.toBeInTheDocument();
   });
 
-  it('一般用户：名称、首字母头像、个人资料、登出，无用户管理', () => {
+  it('一般使用者：名稱、首字母頭像、個人資料、登出，無使用者管理', () => {
     mockUseAuth.mockReturnValue(base({ user: fakeUser, profile: fakeProfile }));
     renderNav();
     expect(screen.getByText('Alice')).toBeInTheDocument();
     expect(screen.getByText('A')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '个人资料' })).toHaveAttribute('href', '/profile');
-    expect(screen.queryByRole('link', { name: '用户管理' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '個人資料' })).toHaveAttribute('href', '/profile');
+    expect(screen.queryByRole('link', { name: '使用者管理' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '登出' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: '登录' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '登入' })).not.toBeInTheDocument();
   });
 
-  it('admin 显示用户管理', () => {
+  it('admin 顯示使用者管理', () => {
     mockUseAuth.mockReturnValue(base({ user: fakeUser, profile: fakeProfile, isAdmin: true }));
     renderNav();
-    expect(screen.getByRole('link', { name: '用户管理' })).toHaveAttribute('href', '/admin/users');
+    expect(screen.getByRole('link', { name: '使用者管理' })).toHaveAttribute('href', '/admin/users');
   });
 
-  it('登出后导向 /login', async () => {
+  it('登出後導向 /login', async () => {
     const signOut = vi.fn().mockResolvedValue(undefined);
     mockUseAuth.mockReturnValue(base({ user: fakeUser, profile: fakeProfile, signOut }));
     renderNav();

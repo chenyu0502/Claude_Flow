@@ -31,7 +31,7 @@ export default function LoginPage() {
     setError(null);
     const trimmed = email.trim();
     if (!trimmed || !password) {
-      setError('请输入 email 和密码');
+      setError('請輸入 email 和密碼');
       return;
     }
     setSubmitting(true);
@@ -49,13 +49,13 @@ export default function LoginPage() {
   return (
     <div className="container narrow auth-page">
       <div className="card auth-card">
-        <h1>登录</h1>
-        <p className="auth-subtitle">欢迎回来，请选择登录方式</p>
+        <h1>登入</h1>
+        <p className="auth-subtitle">歡迎回來，請選擇登入方式</p>
 
         <div className="auth-alerts">
           {pendingLinkEmail && (
             <div className="alert alert-info" role="alert">
-              {pendingLinkEmail} 已用其他方式注册，请先用原本的方式登录，完成后会自动绑定新的登录方式
+              {pendingLinkEmail} 已用其他方式註冊，請先用原本的方式登入，完成後會自動綁定新的登入方式
             </div>
           )}
           {error && (
@@ -97,7 +97,7 @@ export default function LoginPage() {
             />
           </div>
           <div className="field">
-            <label htmlFor="login-password">密码</label>
+            <label htmlFor="login-password">密碼</label>
             <input
               id="login-password"
               type="password"
@@ -109,15 +109,15 @@ export default function LoginPage() {
             />
           </div>
           <Link to="/reset-password" className="auth-forgot">
-            忘记密码？
+            忘記密碼？
           </Link>
           <button type="submit" className="btn btn-primary btn-block" disabled={busy}>
-            {submitting ? '登录中…' : '登录'}
+            {submitting ? '登入中…' : '登入'}
           </button>
         </form>
 
         <p className="auth-footer">
-          还没有账号？<Link to="/register">注册</Link>
+          還沒有帳號？<Link to="/register">註冊</Link>
         </p>
       </div>
     </div>

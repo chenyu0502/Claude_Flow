@@ -10,7 +10,7 @@ interface AvatarProps {
   large?: boolean;
 }
 
-/** 头像：有 photoURL 显示图片（载入失败退回首字母），否则显示首字母圆形 */
+/** 頭像：有 photoURL 顯示圖片（載入失敗退回首字母），否則顯示首字母圓形 */
 export function Avatar({ name, photoURL, large }: AvatarProps) {
   const [broken, setBroken] = useState(false);
   const cls = large ? 'avatar avatar-lg' : 'avatar';
@@ -32,8 +32,8 @@ export default function NavBar() {
   const navigate = useNavigate();
   const [signingOut, setSigningOut] = useState(false);
 
-  // profile 存在时以 Firestore 为准（用户可能刻意清空头像），否则退回 Auth 资料
-  const name = (profile ? profile.displayName : user?.displayName) || user?.email || '用户';
+  // profile 存在時以 Firestore 為準（使用者可能刻意清空頭像），否則退回 Auth 資料
+  const name = (profile ? profile.displayName : user?.displayName) || user?.email || '使用者';
   const photoURL = profile ? profile.photoURL : (user?.photoURL ?? null);
 
   async function handleSignOut() {
@@ -52,7 +52,7 @@ export default function NavBar() {
         <Link to="/" className="navbar-brand">
           Claude Flow
         </Link>
-        <nav className="navbar-right" aria-label="主导航">
+        <nav className="navbar-right" aria-label="主導覽">
           {loading ? null : user ? (
             <>
               <span className="navbar-user" title={name}>
@@ -60,11 +60,11 @@ export default function NavBar() {
                 <span className="navbar-name">{name}</span>
               </span>
               <NavLink to="/profile" className={navClass}>
-                个人资料
+                個人資料
               </NavLink>
               {isAdmin && (
                 <NavLink to="/admin/users" className={navClass}>
-                  用户管理
+                  使用者管理
                 </NavLink>
               )}
               <button type="button" className="btn btn-sm" onClick={handleSignOut} disabled={signingOut}>
@@ -74,10 +74,10 @@ export default function NavBar() {
           ) : (
             <>
               <Link to="/login" className="btn btn-sm">
-                登录
+                登入
               </Link>
               <Link to="/register" className="btn btn-sm btn-primary">
-                注册
+                註冊
               </Link>
             </>
           )}
