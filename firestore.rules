@@ -1,7 +1,7 @@
 rules_version = '2';
 
 // Firestore Security Rules（规格见 CONTRACTS.md「Security Rules 规格」）
-// 只开放 users/{uid} 与 portfolios/{uid}，其他集合一律拒绝。
+// 只开放 users/{uid}、portfolios/{uid} 与 handan/{docId}，其他集合一律拒绝。
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -104,9 +104,15 @@ service cloud.firestore {
       allow read, write: if signedIn() && request.auth.uid == userId;
     }
 
-    // ⚠️ 部署到 myfirebase-22090 之前：線上規則還有一段 handan/{docId}
-    // （台股損益存摺 HanDan 的手機端讀取用），內容只存在 Firebase Console。
-    // 必須先從 Console 取回那段、合併到這裡，否則部署會讓存摺手機版讀不到資料。
+    // 台股損益存摺（HanDan）：手機端唯讀。
+    // 資料由本機 serve.py 以服務帳戶寫入，服務帳戶會繞過安全規則，
+    // 因此這裡把前端寫入一律擋掉，手機端即使憑證外流也只能讀不能改。
+    // （2026-11-12 從 Firebase Console 的線上規則原樣併入，原本只存在 Console。）
+    match /handan/{docId} {
+      allow read: if request.auth != null
+                  && request.auth.uid == '3U816AjRimMRL7l4x79Z6l2mFtx2';
+      allow write: if false;
+    }
 
     // 其他集合：全部拒绝（未匹配的路径默认即拒绝，这里显式写出）
     match /{document=**} {

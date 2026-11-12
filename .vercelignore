@@ -1,0 +1,9 @@
+# vercel CLI 部署時不上傳的檔案。
+# .env* 尤其不能上傳：.env.local 裡的 VITE_USE_EMULATOR=true 會被 Vite 讀進正式版，
+# 讓正式網站去連本機 Emulator。正式環境的變數一律在 Vercel 專案設定中管理。
+.env*
+!.env.example
+node_modules
+dist
+.firebase
+*.log

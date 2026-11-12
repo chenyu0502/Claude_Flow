@@ -52,7 +52,7 @@ npm run typecheck
 
 沿用原台股分析的 Firebase 專案，你用同一個 Google 帳號登入就會看到原本的持股。
 
-1. **合併線上規則（必做）**：`myfirebase-22090` 的線上規則還有一段 `handan/{docId}`（台股損益存摺 HanDan 手機端讀取用），只存在 Firebase Console。先從 Console → Firestore → 規則 取回那段，合併進 `firestore.rules`，再部署：`npx firebase deploy --only firestore:rules --project myfirebase-22090`。直接部署會讓存摺手機版讀不到資料。
+1. **發布規則**：`firestore.rules` 已包含 `myfirebase-22090` 上全部三段規則（`users`、`portfolios`，以及台股損益存摺 HanDan 手機端用的 `handan`，2026-11-12 從 Console 併入）。把整份貼到 Console → Firestore → 規則 發布，或執行 `npx firebase deploy --only firestore:rules --project myfirebase-22090`。之後改規則一律改這個檔案，不要只在 Console 上改，否則下次部署會被覆蓋。
 2. **Authentication → Sign-in method**：Google 已啟用；要用 Email/密碼或 GitHub 再另外啟用（GitHub 需先到 GitHub → Settings → Developer settings → OAuth Apps 新建，Callback URL 填 `https://myfirebase-22090.firebaseapp.com/__/auth/handler`）。
 3. **Authentication → Settings → Authorized domains**：加入 Claude Flow 的 Vercel 網域。
 4. **Vercel**：匯入 GitHub repo，框架選 Vite，環境變數填 `VITE_FIREBASE_*`（`VITE_USE_EMULATOR=false`）、`FINMIND_TOKEN`、`GEMINI_API_KEY`。`vercel.json` 已設定好 `/stock/` 與 SPA 的轉址規則、API 路徑排除。

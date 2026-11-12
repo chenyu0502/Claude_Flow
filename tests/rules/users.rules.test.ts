@@ -376,6 +376,35 @@ describe('portfolios（台股分析）', () => {
   });
 });
 
+describe('handan（台股損益存摺，手機端唯讀）', () => {
+  const OWNER = '3U816AjRimMRL7l4x79Z6l2mFtx2';
+
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'handan', 'snapshot'), { payload: '{}', updatedAt: 'x' });
+    });
+  });
+
+  it('指定的帳號可以讀', async () => {
+    await assertSucceeds(getDoc(doc(dbAs(OWNER), 'handan', 'snapshot')));
+  });
+
+  it('其他帳號（含 Claude Flow 管理員）不能讀', async () => {
+    await seed({ uid: 'admin', role: 'admin' });
+    await assertFails(getDoc(doc(dbAs('alice'), 'handan', 'snapshot')));
+    await assertFails(getDoc(doc(dbAs('admin'), 'handan', 'snapshot')));
+  });
+
+  it('未登入不能讀', async () => {
+    await assertFails(getDoc(doc(testEnv.unauthenticatedContext().firestore(), 'handan', 'snapshot')));
+  });
+
+  it('任何人都不能從前端寫入（含指定的帳號）', async () => {
+    await assertFails(setDoc(doc(dbAs(OWNER), 'handan', 'snapshot'), { payload: 'x' }));
+    await assertFails(setDoc(doc(dbAs('alice'), 'handan', 'other'), { payload: 'x' }));
+  });
+});
+
 describe('其他集合', () => {
   it('全部拒绝（含 admin）', async () => {
     await seed({ uid: 'admin', role: 'admin' });
