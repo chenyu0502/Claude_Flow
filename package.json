@@ -4,8 +4,10 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/fetch-interior.mjs --dev --if-missing",
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && node scripts/fetch-interior.mjs && vite build",
+    "interior:update": "node scripts/fetch-interior.mjs --dev",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

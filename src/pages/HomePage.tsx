@@ -46,6 +46,10 @@ export default function HomePage() {
           </Link>
         </div>
       </div>
+      <a href="/interior/" className="card home-link-card">
+        <h2>室內設計</h2>
+        <p className="muted">2D 平面圖即時生成 3D、拖拉家具門窗、風格模板 AI 自動設計 →</p>
+      </a>
       {isAdmin && (
         <a href="/stock/" className="card home-link-card">
           <h2>台股分析</h2>

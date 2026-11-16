@@ -8,11 +8,15 @@
       "maxDuration": 60
     }
   },
+  "redirects": [
+    { "source": "/interior", "destination": "/interior/", "permanent": false }
+  ],
   "rewrites": [
     { "source": "/stock", "destination": "/stock/index.html" },
     { "source": "/stock/(.*)", "destination": "/stock/index.html" },
+    { "source": "/interior/", "destination": "/interior/index.html" },
     {
-      "source": "/((?!api/|assets/|stock/|version.json).*)",
+      "source": "/((?!api/|assets/|stock/|interior/|version.json).*)",
       "destination": "/index.html"
     }
   ]

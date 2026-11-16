@@ -62,6 +62,10 @@ export default function NavBar() {
               <NavLink to="/profile" className={navClass}>
                 個人資料
               </NavLink>
+              {/* 室內設計是獨立頁面（/interior/，來自 Interior_Decoration repo），用一般連結整頁切換 */}
+              <a href="/interior/" className="nav-link">
+                室內設計
+              </a>
               {isAdmin && (
                 <>
                   {/* 台股分析是獨立頁面（/stock/），用一般連結整頁切換，不走 React Router */}

@@ -8,6 +8,9 @@ firebase-debug*.log
 firestore-debug.log
 ui-debug.log
 
+# 室內設計：建置時由 scripts/fetch-interior.mjs 從它自己的 repo 抓最新版，不進這個 repo
+public/interior
+
 .vercel
 .env*
 !.env.example
