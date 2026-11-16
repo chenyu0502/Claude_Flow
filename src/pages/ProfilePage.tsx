@@ -1,8 +1,9 @@
-// OWNER: Agent E
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import type { Timestamp } from 'firebase/firestore';
+import { KeyRound, Mail, PenLine } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { Avatar } from '../components/NavBar';
+import { GithubIcon, GoogleIcon } from '../components/OAuthButtons';
 import { auth } from '../lib/firebase';
 import { authErrorMessage, isUserCancelled, linkProvider, unlinkProvider } from '../services/auth';
 import { ensureUserProfile, updateOwnProfile } from '../services/users';
@@ -10,6 +11,12 @@ import { PROVIDER_LABELS, SUPPORTED_PROVIDERS, type ProviderId } from '../types/
 import './profile.css';
 
 export const DISPLAY_NAME_MAX = 50;
+
+const PROVIDER_ICONS: Record<ProviderId, ReactNode> = {
+  'google.com': <GoogleIcon />,
+  'github.com': <GithubIcon />,
+  password: <Mail size={18} aria-hidden="true" />,
+};
 
 export function formatTimestamp(ts: Timestamp | null | undefined): string {
   if (!ts) return '—';
@@ -120,18 +127,20 @@ export default function ProfilePage() {
   const headerName = profile.displayName || profile.email || user.email;
 
   return (
-    <div className="container profile-page stack">
-      <section className="card stack">
-        <div className="profile-header">
-          <Avatar name={headerName} photoURL={profile.photoURL} large />
-          <div className="profile-header-info">
-            <h1>{profile.displayName || '未命名使用者'}</h1>
-            <div className="row">
-              <span className="muted profile-email">{profile.email ?? user.email ?? '—'}</span>
-              <span className={isAdmin ? 'badge badge-admin' : 'badge'}>{isAdmin ? '管理員' : '一般使用者'}</span>
-              {profile.disabled && <span className="badge badge-danger">已停用</span>}
-            </div>
-          </div>
+    <div className="container profile-page">
+      <header className="page-head">
+        <span className="eyebrow">帳號</span>
+        <h1>個人資料</h1>
+        <p>管理你在 Claude Flow 的顯示名稱、頭像與登入方式。</p>
+      </header>
+
+      <aside className="card profile-side">
+        <Avatar name={headerName} photoURL={profile.photoURL} large />
+        <h2>{profile.displayName || '未命名使用者'}</h2>
+        <span className="profile-email">{profile.email ?? user.email ?? '—'}</span>
+        <div className="row" style={{ justifyContent: 'center' }}>
+          <span className={isAdmin ? 'badge badge-admin' : 'badge'}>{isAdmin ? '管理員' : '一般使用者'}</span>
+          {profile.disabled && <span className="badge badge-danger">已停用</span>}
         </div>
         <dl className="profile-meta">
           <dt>建立時間</dt>
@@ -139,10 +148,19 @@ export default function ProfilePage() {
           <dt>最後登入</dt>
           <dd>{formatTimestamp(profile.lastLoginAt)}</dd>
         </dl>
-      </section>
+      </aside>
 
+      <div className="profile-main">
       <section className="card">
-        <h2>編輯資料</h2>
+        <div className="section-title">
+          <span className="icon-tile">
+            <PenLine size={20} aria-hidden="true" />
+          </span>
+          <div>
+            <h2>編輯資料</h2>
+            <p className="muted">名稱最多 {DISPLAY_NAME_MAX} 字，頭像需為 https 網址。</p>
+          </div>
+        </div>
         <form className="stack" onSubmit={handleSave} noValidate>
           <div className="field">
             <label htmlFor="displayName">顯示名稱</label>
@@ -175,13 +193,24 @@ export default function ProfilePage() {
       </section>
 
       <section className="card stack">
-        <h2>登入方式</h2>
+        <div className="section-title" style={{ marginBottom: 0 }}>
+          <span className="icon-tile sage">
+            <KeyRound size={20} aria-hidden="true" />
+          </span>
+          <div>
+            <h2>登入方式</h2>
+            <p className="muted">綁定多種方式，任何一種都能登入同一個帳號。</p>
+          </div>
+        </div>
         <ul className="provider-list">
           {SUPPORTED_PROVIDERS.map((id) => {
             const isLinked = linked.includes(id);
             return (
               <li key={id} className="provider-item" data-testid={`provider-${id}`}>
-                <span className="provider-name">{PROVIDER_LABELS[id]}</span>
+                <span className="provider-name">
+                  {PROVIDER_ICONS[id]}
+                  {PROVIDER_LABELS[id]}
+                </span>
                 <span className="row">
                   {isLinked ? (
                     <>
@@ -220,6 +249,7 @@ export default function ProfilePage() {
           </div>
         )}
       </section>
+      </div>
     </div>
   );
 }

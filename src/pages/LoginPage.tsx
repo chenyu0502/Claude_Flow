@@ -4,6 +4,7 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { authErrorMessage } from '../services/auth';
 import OAuthButtons from '../components/OAuthButtons';
+import AuthShell from '../components/AuthShell';
 import './auth.css';
 
 interface LocationState {
@@ -47,7 +48,7 @@ export default function LoginPage() {
   const busy = submitting || oauthBusy;
 
   return (
-    <div className="container narrow auth-page">
+    <AuthShell>
       <div className="card auth-card">
         <h1>登入</h1>
         <p className="auth-subtitle">歡迎回來，請選擇登入方式</p>
@@ -120,6 +121,6 @@ export default function LoginPage() {
           還沒有帳號？<Link to="/register">註冊</Link>
         </p>
       </div>
-    </div>
+    </AuthShell>
   );
 }

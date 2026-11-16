@@ -1,59 +1,61 @@
-/* OWNER: Agent D — 登入/註冊/重設密碼頁專屬樣式 */
-.auth-page {
-  min-height: calc(100vh - 140px);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-.auth-card h1 {
-  font-size: 1.5rem;
-  text-align: center;
-}
-.auth-subtitle {
-  text-align: center;
-  color: var(--muted);
-  margin: -0.25rem 0 1.25rem;
-  font-size: 0.925rem;
-}
-.auth-alerts:not(:empty) {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-.alert-info {
-  background: color-mix(in srgb, var(--primary) 12%, var(--surface));
-  color: var(--text);
-  border: 1px solid color-mix(in srgb, var(--primary) 35%, transparent);
-}
-.field-error {
-  color: var(--danger);
-  font-size: 0.8rem;
-}
-.field input[aria-invalid='true'] {
-  border-color: var(--danger);
-}
-.auth-forgot {
-  align-self: flex-end;
-  font-size: 0.875rem;
-  margin-top: -4px;
-}
-.auth-footer {
-  text-align: center;
-  margin-top: 20px;
-  font-size: 0.9rem;
-  color: var(--muted);
-}
-.oauth-icon {
-  flex-shrink: 0;
+/* 登入／註冊／重設密碼頁：左側品牌側欄 + 右側表單卡片 */
+.auth-page { min-height: calc(100vh - 60px); display: flex; align-items: center; }
+.auth-shell {
+  width: 100%; max-width: 940px; margin: 0 auto;
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 420px); gap: 0;
+  border-radius: var(--radius-lg); overflow: hidden;
+  border: 1px solid var(--border); box-shadow: var(--shadow-lg); background: var(--surface);
 }
 
-@media (max-width: 480px) {
-  .auth-page {
-    min-height: auto;
-    padding-top: 12px;
-  }
-  .auth-card {
-    padding: 20px 16px;
-  }
+.auth-aside {
+  position: relative; padding: 40px 36px;
+  display: flex; flex-direction: column; gap: 22px;
+  color: var(--primary-text);
+  background:
+    radial-gradient(420px 260px at 110% 110%, color-mix(in srgb, var(--gold) 55%, transparent), transparent 70%),
+    radial-gradient(360px 240px at -10% -10%, color-mix(in srgb, #ffffff 18%, transparent), transparent 70%),
+    linear-gradient(160deg, var(--primary), color-mix(in srgb, var(--primary) 70%, #3a2418));
+}
+/* 現代簡約：側欄改成靛藍到深紫的冷色漸層 */
+:root[data-style='modern'] .auth-aside {
+  background:
+    radial-gradient(420px 260px at 110% 110%, color-mix(in srgb, var(--sage) 45%, transparent), transparent 70%),
+    linear-gradient(160deg, #4f46e5, #312e81);
+  color: #ffffff;
+}
+.auth-aside-brand { display: inline-flex; align-items: center; gap: 12px; font-family: var(--font-heading); font-size: 1.3rem; font-weight: 700; }
+.auth-aside-brand svg rect { fill: color-mix(in srgb, var(--primary-text) 18%, transparent); }
+.auth-aside-quote { font-family: var(--font-heading); font-size: 1.65rem; font-weight: 700; line-height: 1.45; margin: 28px 0 0; }
+.auth-aside-list {
+  list-style: none; margin: auto 0 0; padding: 18px 0 0; display: flex; flex-direction: column; gap: 12px;
+  font-size: 0.92rem; opacity: 0.92; border-top: 1px solid color-mix(in srgb, var(--primary-text) 22%, transparent);
+}
+.auth-aside-list li { display: flex; align-items: center; gap: 10px; }
+
+.auth-main { padding: 8px; display: flex; align-items: center; }
+.auth-main .auth-card { width: 100%; border: none; box-shadow: none; padding: 32px 28px; }
+
+.auth-card h1 { font-size: 1.6rem; margin-bottom: 6px; }
+.auth-subtitle { color: var(--muted); margin: 0 0 1.4rem; font-size: 0.95rem; }
+.auth-alerts:not(:empty) { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.alert-info {
+  background: var(--primary-soft); color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
+}
+.field-error { color: var(--danger); font-size: 0.8rem; }
+.field input[aria-invalid='true'] { border-color: var(--danger); }
+.field input[aria-invalid='true']:focus { box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 25%, transparent); }
+.auth-forgot { align-self: flex-end; font-size: 0.875rem; margin-top: -6px; }
+.auth-footer { text-align: center; margin: 22px 0 0; font-size: 0.9rem; color: var(--muted); }
+.oauth-icon { flex-shrink: 0; }
+
+/* OAuth 按鈕在表單頁改成方角、全寬，與輸入框對齊 */
+.auth-card .btn { border-radius: var(--radius-sm); min-height: 44px; }
+
+@media (max-width: 780px) {
+  .auth-page { min-height: auto; align-items: flex-start; }
+  .auth-shell { grid-template-columns: 1fr; max-width: 440px; }
+  .auth-aside { display: none; }
+  .auth-main { padding: 0; }
+  .auth-main .auth-card { padding: 26px 20px; }
 }

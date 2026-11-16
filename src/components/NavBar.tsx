@@ -1,7 +1,9 @@
-// OWNER: Agent E
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { LogOut, Sofa, TrendingUp, Users } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
+import BrandMark from './BrandMark';
+import StyleToggle from './StyleToggle';
 import './navbar.css';
 
 interface AvatarProps {
@@ -27,6 +29,16 @@ export function Avatar({ name, photoURL, large }: AvatarProps) {
 
 const navClass = ({ isActive }: { isActive: boolean }) => (isActive ? 'nav-link active' : 'nav-link');
 
+/** 圖示 + 文字；手機寬度只留圖示，文字改為視覺隱藏（無障礙名稱仍在）。 */
+function NavItem({ icon, label }: { icon: ReactNode; label: string }) {
+  return (
+    <>
+      {icon}
+      <span className="nav-label">{label}</span>
+    </>
+  );
+}
+
 export default function NavBar() {
   const { user, profile, loading, isAdmin, signOut } = useAuth();
   const navigate = useNavigate();
@@ -35,6 +47,7 @@ export default function NavBar() {
   // profile 存在時以 Firestore 為準（使用者可能刻意清空頭像），否則退回 Auth 資料
   const name = (profile ? profile.displayName : user?.displayName) || user?.email || '使用者';
   const photoURL = profile ? profile.photoURL : (user?.photoURL ?? null);
+  const iconSize = 18;
 
   async function handleSignOut() {
     setSigningOut(true);
@@ -50,43 +63,57 @@ export default function NavBar() {
     <header className="navbar">
       <div className="navbar-inner">
         <Link to="/" className="navbar-brand">
-          Claude Flow
+          <BrandMark size={30} />
+          <span className="navbar-wordmark">Claude Flow</span>
         </Link>
         <nav className="navbar-right" aria-label="主導覽">
+          {/* 風格開關不受登入狀態影響，載入中也可以切換 */}
+          <StyleToggle />
           {loading ? null : user ? (
             <>
-              <span className="navbar-user" title={name}>
+              <div className="navbar-links">
+                {/* 室內設計、台股分析是獨立頁面，用一般連結整頁切換，不走 React Router */}
+                <a href="/interior/" className="nav-link">
+                  <NavItem icon={<Sofa size={iconSize} aria-hidden="true" />} label="室內設計" />
+                </a>
+                {isAdmin && (
+                  <>
+                    <a href="/stock/" className="nav-link">
+                      <NavItem icon={<TrendingUp size={iconSize} aria-hidden="true" />} label="台股分析" />
+                    </a>
+                    <NavLink to="/admin/users" className={navClass}>
+                      <NavItem icon={<Users size={iconSize} aria-hidden="true" />} label="使用者管理" />
+                    </NavLink>
+                  </>
+                )}
+              </div>
+              <span className="navbar-sep" aria-hidden="true" />
+              <NavLink
+                to="/profile"
+                className={({ isActive }) => (isActive ? 'navbar-user active' : 'navbar-user')}
+                aria-label="個人資料"
+                title={`個人資料（${name}）`}
+              >
                 <Avatar name={name} photoURL={photoURL} />
                 <span className="navbar-name">{name}</span>
-              </span>
-              <NavLink to="/profile" className={navClass}>
-                個人資料
               </NavLink>
-              {/* 室內設計是獨立頁面（/interior/，來自 Interior_Decoration repo），用一般連結整頁切換 */}
-              <a href="/interior/" className="nav-link">
-                室內設計
-              </a>
-              {isAdmin && (
-                <>
-                  {/* 台股分析是獨立頁面（/stock/），用一般連結整頁切換，不走 React Router */}
-                  <a href="/stock/" className="nav-link">
-                    台股分析
-                  </a>
-                  <NavLink to="/admin/users" className={navClass}>
-                    使用者管理
-                  </NavLink>
-                </>
-              )}
-              <button type="button" className="btn btn-sm" onClick={handleSignOut} disabled={signingOut}>
-                登出
+              <button
+                type="button"
+                className="btn btn-ghost btn-icon"
+                onClick={handleSignOut}
+                disabled={signingOut}
+                aria-label="登出"
+                title="登出"
+              >
+                <LogOut size={iconSize} aria-hidden="true" />
               </button>
             </>
           ) : (
             <>
-              <Link to="/login" className="btn btn-sm">
+              <Link to="/login" className="btn btn-ghost btn-sm">
                 登入
               </Link>
-              <Link to="/register" className="btn btn-sm btn-primary">
+              <Link to="/register" className="btn btn-primary btn-sm">
                 註冊
               </Link>
             </>

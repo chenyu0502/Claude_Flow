@@ -4,6 +4,7 @@ import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { authErrorMessage } from '../services/auth';
 import OAuthButtons from '../components/OAuthButtons';
+import AuthShell from '../components/AuthShell';
 import './auth.css';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -92,7 +93,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="container narrow auth-page">
+    <AuthShell>
       <div className="card auth-card">
         <h1>註冊</h1>
         <p className="auth-subtitle">建立新帳號</p>
@@ -153,6 +154,6 @@ export default function RegisterPage() {
           已有帳號？<Link to="/login">登入</Link>
         </p>
       </div>
-    </div>
+    </AuthShell>
   );
 }

@@ -1,5 +1,6 @@
 // OWNER: Agent F
 import { useEffect, useMemo, useState } from 'react';
+import { ShieldCheck, Users, UserX } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import { setUserDisabled, setUserRole, subscribeAllUsers } from '../../services/users';
 import { PROVIDER_LABELS, type Role, type UserProfile } from '../../types/user';
@@ -138,20 +139,39 @@ export default function AdminUsersPage() {
 
   return (
     <div className="container admin-users">
-      <h1>使用者管理</h1>
+      <header className="page-head">
+        <span className="eyebrow">管理員</span>
+        <h1>使用者管理</h1>
+        <p>檢視所有帳號、調整角色，或停用帳號。</p>
+      </header>
 
       <div className="admin-stats">
         <div className="card admin-stat">
-          <div className="admin-stat-label muted">總人數</div>
-          <div className="admin-stat-value" data-testid="stat-total">{statValue(stats.total)}</div>
+          <span className="icon-tile">
+            <Users size={20} aria-hidden="true" />
+          </span>
+          <div>
+            <div className="admin-stat-label muted">總人數</div>
+            <div className="admin-stat-value" data-testid="stat-total">{statValue(stats.total)}</div>
+          </div>
         </div>
         <div className="card admin-stat">
-          <div className="admin-stat-label muted">管理員</div>
-          <div className="admin-stat-value" data-testid="stat-admins">{statValue(stats.admins)}</div>
+          <span className="icon-tile gold">
+            <ShieldCheck size={20} aria-hidden="true" />
+          </span>
+          <div>
+            <div className="admin-stat-label muted">管理員</div>
+            <div className="admin-stat-value" data-testid="stat-admins">{statValue(stats.admins)}</div>
+          </div>
         </div>
         <div className="card admin-stat">
-          <div className="admin-stat-label muted">已停用</div>
-          <div className="admin-stat-value" data-testid="stat-disabled">{statValue(stats.disabled)}</div>
+          <span className="icon-tile danger">
+            <UserX size={20} aria-hidden="true" />
+          </span>
+          <div>
+            <div className="admin-stat-label muted">已停用</div>
+            <div className="admin-stat-value" data-testid="stat-disabled">{statValue(stats.disabled)}</div>
+          </div>
         </div>
       </div>
 
@@ -197,11 +217,9 @@ export default function AdminUsersPage() {
               <thead>
                 <tr>
                   <th>使用者</th>
-                  <th>電子郵件</th>
                   <th>登入方式</th>
                   <th>角色</th>
                   <th>狀態</th>
-                  <th>建立時間</th>
                   <th>最後登入</th>
                   <th>操作</th>
                 </tr>
@@ -223,13 +241,15 @@ export default function AdminUsersPage() {
                               {(u.displayName || u.email || '?').charAt(0).toUpperCase()}
                             </span>
                           )}
-                          <span>
-                            {name}
-                            {isSelf && <span className="muted">（你）</span>}
-                          </span>
+                          <div className="admin-user-text">
+                            <span className="admin-user-name">
+                              {name}
+                              {isSelf && <span className="muted">（你）</span>}
+                            </span>
+                            <span className="admin-user-email muted">{u.email ?? '—'}</span>
+                          </div>
                         </div>
                       </td>
-                      <td>{u.email ?? '—'}</td>
                       <td>
                         <div className="admin-badges">
                           {u.providers.length === 0 ? (
@@ -255,8 +275,9 @@ export default function AdminUsersPage() {
                           <span className="badge admin-badge-active">正常</span>
                         )}
                       </td>
-                      <td>{formatTime(u.createdAt)}</td>
-                      <td>{formatTime(u.lastLoginAt)}</td>
+                      <td className="admin-time" title={`建立時間：${formatTime(u.createdAt)}`}>
+                        {formatTime(u.lastLoginAt)}
+                      </td>
                       <td>
                         <div className="admin-actions" title={isSelf ? SELF_HINT : undefined}>
                           <select

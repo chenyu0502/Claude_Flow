@@ -3,6 +3,7 @@ import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { authErrorMessage } from '../services/auth';
+import AuthShell from '../components/AuthShell';
 import './auth.css';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -49,7 +50,7 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div className="container narrow auth-page">
+    <AuthShell>
       <div className="card auth-card">
         <h1>重設密碼</h1>
         <p className="auth-subtitle">輸入註冊時使用的 email，我們會寄送重設密碼連結</p>
@@ -92,6 +93,6 @@ export default function ResetPasswordPage() {
           <Link to="/login">返回登入</Link>
         </p>
       </div>
-    </div>
+    </AuthShell>
   );
 }
