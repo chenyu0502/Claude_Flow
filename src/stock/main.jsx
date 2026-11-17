@@ -6,25 +6,36 @@ import { auth } from '../lib/firebase';
 import { subscribeUserProfile } from '../services/users';
 import { store } from './store/index.js';
 import { setUser } from './store/authSlice.js';
-import { syncFromCloud, subscribeToCloud } from './store/persistence.js';
+import { hydrate } from './store/portfolioSlice.js';
+import {
+  readLocal,
+  syncFromCloud,
+  subscribeToCloud,
+  takeLegacyLocal,
+  writeLocal,
+} from './store/persistence.js';
 import App from './App.jsx';
 import './index.css';
 
 /*
  * 台股分析併入 Claude Flow 後的入口（獨立頁面 /stock/）。
  *
- * 登入狀態與 Claude Flow 共用（同網域、同一個 Firebase 實例），但只有
- * Claude Flow 的管理員（users/{uid}.role === 'admin' 且未停用）可以使用。
+ * 登入狀態與 Claude Flow 共用（同網域、同一個 Firebase 實例），
+ * 所有登入且未停用的 Claude Flow 使用者都可以使用。每個人的持股存在
+ * portfolios/{自己的 uid}，Firestore 規則保證彼此讀不到。
  *
- * 權限確認之前絕不啟動雲端同步：同步會把本機 localStorage 的持股合併後寫回
- * portfolios/{uid}，若對非管理員也啟動，同一台電腦上前一位使用者的持股就會
- * 被寫進另一個帳號的雲端文件。
+ * 本機資料也按帳號分開存（persistence.js）：同一台電腦換人登入時，
+ * 前一個人的持股不會被合併進下一個人的雲端文件。
+ *
+ * 換帳號的順序很重要（startSync）：先在 auth.user 為 null 的狀態下 hydrate 該帳號的
+ * 本機資料（persistence middleware 不寫任何地方），再 setUser，最後 syncFromCloud。
+ * 先 setUser 再 hydrate 的話，空的 hydrate 會排進 2 秒後的雲端寫入，可能覆寫雲端持股。
  *
  * 同步的順序沿用原本的設計：先同步再訂閱。初次同步會把本機獨有的資料回寫
  * 雲端，兩者同時進行會讓合併在兩條路徑上交錯，難以推理。
  */
 
-/** @typedef {'checking' | 'signed-out' | 'denied' | 'granted'} Access */
+/** @typedef {'checking' | 'signed-out' | 'denied' | 'disabled' | 'granted'} Access */
 
 let unsubscribeCloud = null;
 let unsubscribeProfile = null;
@@ -42,25 +53,42 @@ function setAccess(next) {
 }
 
 function stopSync() {
-  // 登出、換人或權限被拔掉時一定要收掉，否則舊帳號的快照會繼續灌進 state。
+  // 登出、換人或被停用時一定要收掉，否則舊帳號的快照會繼續灌進 state。
   unsubscribeCloud?.();
   unsubscribeCloud = null;
   if (syncingUid !== null) {
     syncingUid = null;
+    // 先清掉 uid 再清空持股：順序反過來，清空的動作會被當成「這個帳號把持股刪光」寫回去。
     store.dispatch(setUser(null));
+    store.dispatch(hydrate({}));
   }
 }
 
-/** @param {import('firebase/auth').User} user */
-function startSync(user) {
+/**
+ * @param {import('firebase/auth').User} user
+ * @param {boolean} isAdmin 只有管理員能接收舊版未分帳號的本機資料
+ */
+function startSync(user, isAdmin) {
   if (syncingUid === user.uid) return;
   stopSync();
   const { uid } = user;
   syncingUid = uid;
-  // 只傳顯示所需的欄位：整個 Firebase User 物件含方法，會觸發 Redux 的序列化檢查警告。
+
+  // 1. 還原這個帳號自己的本機資料（此時 auth.user 是 null，middleware 不會寫任何地方）。
+  let local = readLocal(uid);
+  if (!local && isAdmin) {
+    // 開放前只有管理員能進台股頁，舊版未分帳號的資料一定是管理員的，搬到他的鍵名下。
+    local = takeLegacyLocal();
+    if (local) writeLocal(uid, local);
+  }
+  store.dispatch(hydrate(local ?? {}));
+
+  // 2. 標記登入。只傳顯示所需的欄位：整個 Firebase User 物件含方法，會觸發 Redux 的序列化檢查警告。
   store.dispatch(
     setUser({ uid, displayName: user.displayName, email: user.email, photoURL: user.photoURL }),
   );
+
+  // 3. 與雲端合併，完成後再訂閱。
   syncFromCloud(store, uid).then(() => {
     // 同步期間可能又登出、換了帳號或被降級，確認還是同一個人才訂閱。
     if (syncingUid !== uid) return;
@@ -82,12 +110,13 @@ onAuthStateChanged(auth, (user) => {
   unsubscribeProfile = subscribeUserProfile(
     user.uid,
     (profile) => {
-      if (profile && profile.role === 'admin' && !profile.disabled) {
-        startSync(user);
+      if (profile && !profile.disabled) {
+        startSync(user, profile.role === 'admin');
         setAccess('granted');
       } else {
         stopSync();
-        setAccess('denied');
+        // 沒有 Claude Flow 使用者資料（從沒在 Claude Flow 登入過）與被停用，給不同提示。
+        setAccess(profile?.disabled ? 'disabled' : 'denied');
       }
     },
     () => {
@@ -137,8 +166,11 @@ function Gate() {
       </Provider>
     );
   }
+  if (current === 'disabled') {
+    return <Notice title="帳號已停用">你的帳號已被停用，請聯絡管理員。</Notice>;
+  }
   if (current === 'denied') {
-    return <Notice title="沒有權限">台股分析目前只開放給管理員使用。</Notice>;
+    return <Notice title="請先登入 Claude Flow">請從 Claude Flow 首頁登入後，再開啟台股分析。</Notice>;
   }
   return <div className="flex min-h-full items-center justify-center text-sm text-slate-400">載入中…</div>;
 }

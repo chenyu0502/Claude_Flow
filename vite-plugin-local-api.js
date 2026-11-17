@@ -84,7 +84,7 @@ export default function localApiPlugin(env = {}) {
         try {
           // 與正式環境（api/_lib/adapter.js）相同的登入驗證，開發時也走同一條路徑。
           const authMod = await import(pathToFileURL(AUTH_PATH).href);
-          const auth = await authMod.verifyAdmin(req.headers.authorization, env);
+          const auth = await authMod.verifyMember(req.headers.authorization, env);
           if (!auth.ok) {
             send(auth.status, { error: auth.error });
             return;
@@ -100,7 +100,8 @@ export default function localApiPlugin(env = {}) {
           const query = Object.fromEntries(url.searchParams.entries());
           // 正式環境由 Vercel 自動解析 JSON 主體，dev server 沒有這層，需自行讀取。
           const body = req.method === 'POST' ? await readJsonBody(req) : {};
-          const result = await handler({ ...query, ...body }, env);
+          const ctx = { uid: auth.uid, role: auth.role, geminiKey: authMod.readGeminiKey(req.headers) };
+          const result = await handler({ ...query, ...body }, env, ctx);
           send(result.status, result.body);
         } catch (err) {
           send(502, { error: err?.message ?? '資料取用失敗' });

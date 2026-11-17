@@ -127,17 +127,14 @@ export default function HomePage() {
           title="室內設計"
           description="2D 平面圖即時生成 3D、拖拉家具門窗、風格模板 AI 自動設計。"
         />
-        {isAdmin && (
-          <AppCard
-            href="/stock/"
-            external
-            tone="gold"
-            icon={<TrendingUp size={22} aria-hidden="true" />}
-            title="台股分析"
-            description="持股、績效、個股分析與 AI 解讀。"
-            tag="管理員"
-          />
-        )}
+        <AppCard
+          href="/stock/"
+          external
+          tone="gold"
+          icon={<TrendingUp size={22} aria-hidden="true" />}
+          title="台股分析"
+          description="持股、績效、個股分析與 AI 解讀（AI 需使用你自己的 Gemini API Key）。"
+        />
         {isAdmin && (
           <AppCard
             href="/admin/users"

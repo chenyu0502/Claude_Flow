@@ -8,6 +8,7 @@
  */
 
 import { auth } from '../lib/firebase.js';
+import { getGeminiKey } from '../lib/geminiKey.js';
 
 /**
  * 取得帶登入憑證的請求標頭。
@@ -176,7 +177,12 @@ export function fetchUniverse() {
 export async function fetchAnalysis(payload) {
   const res = await fetch('/api/analyze', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(await authHeaders()),
+      // 使用者自己的 Gemini 金鑰（見 lib/geminiKey.js）；沒設定時不帶，伺服器會回「請先設定」。
+      ...(getGeminiKey() ? { 'X-Gemini-Key': getGeminiKey() } : {}),
+    },
     body: JSON.stringify(payload),
   });
   const json = await res.json().catch(() => null);

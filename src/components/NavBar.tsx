@@ -76,15 +76,13 @@ export default function NavBar() {
                 <a href="/interior/" className="nav-link">
                   <NavItem icon={<Sofa size={iconSize} aria-hidden="true" />} label="室內設計" />
                 </a>
+                <a href="/stock/" className="nav-link">
+                  <NavItem icon={<TrendingUp size={iconSize} aria-hidden="true" />} label="台股分析" />
+                </a>
                 {isAdmin && (
-                  <>
-                    <a href="/stock/" className="nav-link">
-                      <NavItem icon={<TrendingUp size={iconSize} aria-hidden="true" />} label="台股分析" />
-                    </a>
-                    <NavLink to="/admin/users" className={navClass}>
-                      <NavItem icon={<Users size={iconSize} aria-hidden="true" />} label="使用者管理" />
-                    </NavLink>
-                  </>
+                  <NavLink to="/admin/users" className={navClass}>
+                    <NavItem icon={<Users size={iconSize} aria-hidden="true" />} label="使用者管理" />
+                  </NavLink>
                 )}
               </div>
               <span className="navbar-sep" aria-hidden="true" />

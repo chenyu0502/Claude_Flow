@@ -53,4 +53,19 @@ describe('toVercelHandler 的登入驗證', () => {
     expect(res.headers['Cache-Control']).toBe('private, max-age=30');
     expect(res.headers['Cache-Control']).not.toMatch(/s-maxage/);
   });
+
+  it('把已驗證的使用者與他自己的 Gemini 金鑰交給 handler', async () => {
+    const handler = vi.fn(async () => ({ status: 200, body: {} }));
+    const verify = vi.fn(async () => ({ ok: true, uid: 'bob', role: 'user' }));
+    const key = 'AIzaSyA1234567890abcdefghij_-XYZ';
+    await toVercelHandler(handler, { verify })({ headers: { 'x-gemini-key': key }, body: {} }, mockRes());
+    expect(handler.mock.calls[0][2]).toEqual({ uid: 'bob', role: 'user', geminiKey: key });
+  });
+
+  it('沒帶 Gemini 金鑰時 geminiKey 為 null', async () => {
+    const handler = vi.fn(async () => ({ status: 200, body: {} }));
+    const verify = vi.fn(async () => ({ ok: true, uid: 'bob', role: 'user' }));
+    await toVercelHandler(handler, { verify })({ headers: {} }, mockRes());
+    expect(handler.mock.calls[0][2].geminiKey).toBeNull();
+  });
 });

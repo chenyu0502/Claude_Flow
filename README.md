@@ -5,7 +5,7 @@
 - 登入方式：Google、GitHub、Email/密碼；同一 email 用不同方式登入時自動綁定
 - 個人資料：編輯顯示名稱與頭像、綁定/解除登入方式
 - 管理員後台（`/admin/users`）：搜尋、篩選、調整角色、停用帳號
-- **台股分析（`/stock/`，僅管理員）**：持股、績效、個股分析與 AI 解讀，由原「台股分析」專案併入
+- **台股分析（`/stock/`，所有登入的使用者）**：持股、績效、個股分析與 AI 解讀，由原「台股分析」專案併入；每個人的持股彼此看不到，AI 解讀需填自己的 Gemini API Key
 - 權限由 Firestore Security Rules 把關（見 `firestore.rules`，規格見 `CONTRACTS.md`）
 
 ## 台股分析的架構
@@ -21,8 +21,10 @@
 
 - **分開的原因**：Tailwind 的全域重設樣式（preflight）與 Claude Flow 的樣式會互相覆蓋，獨立頁面讓兩邊完全隔離。
 - **共用登入**：兩頁共用 `src/lib/firebase.ts` 的同一個 Firebase 實例，同網域的登入狀態自動共通。
-- **管理員限定**：`src/stock/main.jsx` 先確認 `users/{uid}` 為未停用的 admin，才啟動雲端同步並顯示畫面。權限確認前絕不同步，否則同一台電腦上前一位使用者的本機持股可能被寫進別人的雲端文件。
-- **後端 API 也只開放給管理員**：前端每個請求都帶 Firebase ID token，`api/_lib/auth.js` 拿這個 token 去讀 Firestore 的 `users/{uid}`。token 偽造或過期時 Google 會直接拒絕，讀到的文件同時用來確認是未停用的 admin。不需要 service account 金鑰。驗證結果快取 60 秒，所以被降級的管理員最多還能呼叫 60 秒。
+- **開放給所有登入的使用者**：`src/stock/main.jsx` 先確認 `users/{uid}` 存在且未停用，才啟動雲端同步並顯示畫面。
+- **持股彼此隔離**：雲端是 `portfolios/{自己的 uid}`，Firestore 規則只允許本人讀寫（管理員也不例外）。本機 localStorage 也按帳號分開存（鍵名 `tw-stock-portfolio-v1:{uid}`），同一台電腦換人登入，前一個人的持股不會被合併進下一個人的帳號。換帳號時要先在未登入狀態下還原本機資料、再標記登入、再與雲端同步（見 `persistence.js` 開頭說明），順序反過來可能把雲端持股覆寫成空的。
+- **後端 API 也只開放給登入的使用者**：前端每個請求都帶 Firebase ID token，`api/_lib/auth.js` 拿這個 token 去讀 Firestore 的 `users/{uid}`。token 偽造或過期時 Google 會直接拒絕，讀到的文件同時用來確認未停用並取得 role。不需要 service account 金鑰。驗證結果快取 60 秒，所以被停用的帳號最多還能呼叫 60 秒。
+- **AI 解讀用自己的金鑰**：AI 頁上方可填 Gemini API Key，只存在使用者的瀏覽器（按帳號分開），送出分析時以 `X-Gemini-Key` 標頭交給 `/api/analyze` 轉給 Google，不儲存。一般使用者沒填就不能用 AI；只有管理員沒填時可退用伺服器的 `GEMINI_API_KEY`（`analyze.js` 的 `resolveGeminiKey`）。其他資料（三大法人、估值等）仍共用伺服器的 `FINMIND_TOKEN` 額度。
 - **API 回應不經 Vercel 邊緣快取**：成功回應只允許瀏覽器快取（`private, max-age=30`）。邊緣快取命中的請求不會進到函式，等於繞過登入驗證。
 
 ## 本地開發（Emulator，不需要真的 Firebase 專案）

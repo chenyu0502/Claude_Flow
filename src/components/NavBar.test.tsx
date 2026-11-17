@@ -69,6 +69,9 @@ describe('NavBar', () => {
     expect(screen.getByText('A')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '個人資料' })).toHaveAttribute('href', '/profile');
     expect(screen.queryByRole('link', { name: '使用者管理' })).not.toBeInTheDocument();
+    // 台股分析與室內設計開放給所有登入的使用者
+    expect(screen.getByRole('link', { name: '台股分析' })).toHaveAttribute('href', '/stock/');
+    expect(screen.getByRole('link', { name: '室內設計' })).toHaveAttribute('href', '/interior/');
     expect(screen.getByRole('button', { name: '登出' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: '登入' })).not.toBeInTheDocument();
   });
