@@ -1,7 +1,7 @@
 rules_version = '2';
 
-// Firestore Security Rules（规格见 CONTRACTS.md「Security Rules 规格」）
-// 只开放 users/{uid}、portfolios/{uid} 与 handan/{docId}，其他集合一律拒绝。
+// Firestore Security Rules（規格見 CONTRACTS.md「Security Rules 規格」）
+// 只開放 users/{uid}、portfolios/{uid} 與 handan/{docId}，其他集合一律拒絕。
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -13,7 +13,7 @@ service cloud.firestore {
       return /databases/$(database)/documents/users/$(uid);
     }
 
-    // admin = 自己的文档 role == 'admin' 且 disabled == false
+    // admin = 自己的文件 role == 'admin' 且 disabled == false
     function isAdmin() {
       return signedIn()
         && exists(userPath(request.auth.uid))
@@ -21,13 +21,13 @@ service cloud.firestore {
         && get(userPath(request.auth.uid)).data.get('disabled', true) == false;
     }
 
-    // UserProfile 的全部字段键
+    // UserProfile 的全部欄位鍵
     function profileKeys() {
       return ['uid', 'email', 'displayName', 'photoURL', 'role', 'disabled',
               'providers', 'createdAt', 'lastLoginAt'];
     }
 
-    // 本人可改的字段
+    // 本人可改的欄位
     function selfEditableKeys() {
       return ['displayName', 'photoURL', 'email', 'providers', 'lastLoginAt'];
     }
@@ -48,7 +48,7 @@ service cloud.firestore {
       return v is list && v.size() <= 3 && v.hasOnly(['google.com', 'github.com', 'password']);
     }
 
-    // 本人可改字段的值检查（对写入后的完整文档检查）
+    // 本人可改欄位的值檢查（對寫入後的完整文件檢查）
     function validEditableValues(data) {
       return validDisplayName(data.displayName)
         && validPhotoURL(data.photoURL)
@@ -69,7 +69,7 @@ service cloud.firestore {
         && data.lastLoginAt == request.time;
     }
 
-    // 本人更新：未停用；只能动 selfEditableKeys；lastLoginAt 若改动必须是 serverTimestamp()
+    // 本人更新：未停用；只能改 selfEditableKeys；lastLoginAt 若有變動必須是 serverTimestamp()
     function validSelfUpdate(userId) {
       let changed = request.resource.data.diff(resource.data).affectedKeys();
       return request.auth.uid == userId
@@ -79,7 +79,7 @@ service cloud.firestore {
         && (!changed.hasAny(['lastLoginAt']) || request.resource.data.lastLoginAt == request.time);
     }
 
-    // admin 更新他人：只能动 role / disabled；不能改自己（自己走 validSelfUpdate，那里不允许动 role/disabled）
+    // admin 更新他人：只能改 role / disabled；不能改自己（自己走 validSelfUpdate，那裡不允許改 role/disabled）
     function validAdminUpdate(userId) {
       let changed = request.resource.data.diff(resource.data).affectedKeys();
       return request.auth.uid != userId
@@ -90,7 +90,7 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      // 本人可读自己（即使 disabled）；admin 可读全部
+      // 本人可讀自己（即使 disabled）；admin 可讀全部
       allow get: if signedIn() && (request.auth.uid == userId || isAdmin());
       allow list: if isAdmin();
       allow create: if signedIn() && validCreate(userId);
@@ -99,7 +99,7 @@ service cloud.firestore {
     }
 
     // 台股分析的投資組合（沿用原台股分析專案的規則）：只能存取自己的文件。
-    // 管理員限定是前端入口的限制；資料層面每個人本來就只碰得到自己的持股。
+    // 台股分析開放給所有登入的使用者；資料層面每個人只碰得到自己的持股（管理員也不例外）。
     match /portfolios/{userId} {
       allow read, write: if signedIn() && request.auth.uid == userId;
     }
@@ -114,7 +114,7 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // 其他集合：全部拒绝（未匹配的路径默认即拒绝，这里显式写出）
+    // 其他集合：全部拒絕（未比對到的路徑預設即拒絕，這裡明確寫出）
     match /{document=**} {
       allow read, write: if false;
     }

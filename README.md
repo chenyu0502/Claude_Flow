@@ -40,7 +40,7 @@ npm run dev                     # 終端機 3：http://localhost:5173（台股�
 ```
 
 - Emulator 下點 Google / GitHub 登入會彈出 Emulator 的假登入視窗，可以隨意輸入 email 測試。
-- 台股的 `/api/*` 在開發模式由 `vite-plugin-local-api.js` 掛在 dev server 上，會連到真正的上游（證交所、Yahoo、FinMind）。`.env.local` 填了 `FINMIND_TOKEN`、`GEMINI_API_KEY` 才有三大法人、估值與 AI 解讀。
+- 台股的 `/api/*` 在開發模式由 `vite-plugin-local-api.js` 掛在 dev server 上，會連到真正的上游（證交所、Yahoo、FinMind）。`.env.local` 填了 `FINMIND_TOKEN` 才有基本面、法人歷史與產業分類；AI 解讀用頁面上自己填的 Gemini 金鑰（管理員沒填時可退用 `.env.local` 的 `GEMINI_API_KEY`）。
 
 ## 測試
 
@@ -57,7 +57,7 @@ npm run typecheck
 1. **發布規則**：`firestore.rules` 已包含 `myfirebase-22090` 上全部三段規則（`users`、`portfolios`，以及台股損益存摺 HanDan 手機端用的 `handan`，2026-11-12 從 Console 併入）。把整份貼到 Console → Firestore → 規則 發布，或執行 `npx firebase deploy --only firestore:rules --project myfirebase-22090`。之後改規則一律改這個檔案，不要只在 Console 上改，否則下次部署會被覆蓋。
 2. **Authentication → Sign-in method**：Google 已啟用；要用 Email/密碼或 GitHub 再另外啟用（GitHub 需先到 GitHub → Settings → Developer settings → OAuth Apps 新建，Callback URL 填 `https://myfirebase-22090.firebaseapp.com/__/auth/handler`）。
 3. **Authentication → Settings → Authorized domains**：加入 Claude Flow 的 Vercel 網域。
-4. **Vercel**：匯入 GitHub repo，框架選 Vite，環境變數填 `VITE_FIREBASE_*`（`VITE_USE_EMULATOR=false`）、`FINMIND_TOKEN`、`GEMINI_API_KEY`。`vercel.json` 已設定好 `/stock/` 與 SPA 的轉址規則、API 路徑排除。
+4. **Vercel**：匯入 GitHub repo，框架選 Vite，環境變數必填 `VITE_FIREBASE_*`（`VITE_USE_EMULATOR=false`），選填 `FINMIND_TOKEN`（基本面、法人歷史、產業分類）與 `GEMINI_API_KEY`（只供管理員沒填自己的金鑰時備用）、`GEMINI_MODEL`。`vercel.json` 已設定好 `/stock/` 與 SPA 的轉址規則、API 路徑排除。
 5. **第一個管理員**：用 Google 帳號登入 Claude Flow 一次，到 Firestore 控制台把 `users/{你的 uid}` 的 `role` 改為 `admin`。
 
 原台股分析網站（tw-stock-analysis.vercel.app）與這裡讀寫同一份 `portfolios` 資料，可以並行使用，確認新版沒問題再停用。
