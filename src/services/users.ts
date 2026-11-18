@@ -11,12 +11,14 @@ import {
   setDoc,
   Timestamp,
   updateDoc,
+  writeBatch,
   type DocumentData,
   type Unsubscribe,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import type { EditableProfileFields, ProviderId, Role, UserProfile } from '../types/user';
 import { SUPPORTED_PROVIDERS } from '../types/user';
+import { addAdminLogToBatch } from './auditLog';
 
 const USERS = 'users';
 
@@ -172,10 +174,18 @@ export function subscribeAllUsers(
   );
 }
 
+/** 管理員調整角色。變更與操作日誌在同一個批次寫入（規則要求兩者一起成立）。 */
 export async function setUserRole(uid: string, role: Role): Promise<void> {
-  await updateDoc(userRef(uid), { role });
+  const batch = writeBatch(db);
+  batch.update(userRef(uid), { role });
+  addAdminLogToBatch(batch, 'role_change', uid, { role });
+  await batch.commit();
 }
 
+/** 管理員停用／啟用帳號。變更與操作日誌在同一個批次寫入。 */
 export async function setUserDisabled(uid: string, disabled: boolean): Promise<void> {
-  await updateDoc(userRef(uid), { disabled });
+  const batch = writeBatch(db);
+  batch.update(userRef(uid), { disabled });
+  addAdminLogToBatch(batch, 'disabled_change', uid, { disabled });
+  await batch.commit();
 }

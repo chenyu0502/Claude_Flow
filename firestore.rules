@@ -1,7 +1,7 @@
 rules_version = '2';
 
 // Firestore Security Rules（規格見 CONTRACTS.md「Security Rules 規格」）
-// 只開放 users/{uid}、portfolios/{uid} 與 handan/{docId}，其他集合一律拒絕。
+// 只開放 users/{uid}、portfolios/{uid}、auditLogs/{logId} 與 handan/{docId}，其他集合一律拒絕。
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -106,6 +106,71 @@ service cloud.firestore {
       allow create: if signedIn() && validCreate(userId);
       allow update: if signedIn() && (validSelfUpdate(userId) || validAdminUpdate(userId));
       allow delete: if false;
+    }
+
+    // ---- 登入紀錄與操作日誌 auditLogs/{logId} ----
+    // 由前端寫入（Spark 方案沒有 Cloud Functions），所以靠規則確保：
+    // 只能記自己的事（actorUid／actorEmail 與登入憑證一致）、時間由伺服器決定、寫入後不能改也不能刪。
+    // 管理員操作必須和實際的 users 變更寫在同一個批次（getAfter 比對變更後的值），
+    // 不能憑空記一筆沒發生的操作。
+
+    function logKeys() {
+      return ['type', 'actorUid', 'actorEmail', 'targetUid', 'detail', 'device', 'createdAt'];
+    }
+
+    function providerIds() {
+      return ['google.com', 'github.com', 'password'];
+    }
+
+    // 只記自己帳號的事件：targetUid 必須是 null
+    function validSelfLog(d) {
+      let t = d.type;
+      let detail = d.detail;
+      return d.targetUid == null && (
+        ((t == 'login' || t == 'register') && detail.keys().hasOnly(['method']) && detail.method in providerIds())
+        || ((t == 'logout' || t == 'password_change' || t == 'email_verified') && detail.size() == 0)
+        || ((t == 'provider_link' || t == 'provider_unlink')
+            && detail.keys().hasOnly(['provider']) && detail.provider in providerIds())
+        || (t == 'profile_update' && detail.keys().hasOnly(['fields'])
+            && detail.fields is list && detail.fields.size() > 0
+            && detail.fields.hasOnly(['displayName', 'photoURL']))
+      );
+    }
+
+    // 管理員對他人的操作：必須真的在同一批次改了對方的 users 文件
+    function validAdminLog(d) {
+      let t = d.type;
+      let target = d.targetUid;
+      return isAdmin()
+        && target is string && target != request.auth.uid
+        && (
+          (t == 'role_change' && d.detail.keys().hasOnly(['role']) && d.detail.role in ['admin', 'user']
+            && getAfter(userPath(target)).data.role == d.detail.role
+            && get(userPath(target)).data.role != d.detail.role)
+          || (t == 'disabled_change' && d.detail.keys().hasOnly(['disabled']) && d.detail.disabled is bool
+            && getAfter(userPath(target)).data.disabled == d.detail.disabled
+            && get(userPath(target)).data.disabled != d.detail.disabled)
+        );
+    }
+
+    function validLogCreate() {
+      let d = request.resource.data;
+      return signedIn()
+        && d.keys().hasOnly(logKeys())
+        && d.keys().hasAll(logKeys())
+        && d.actorUid == request.auth.uid
+        && d.actorEmail == request.auth.token.get('email', null)
+        && d.createdAt == request.time
+        && (d.device == null || (d.device is string && d.device.size() <= 100))
+        && d.detail is map
+        && (validSelfLog(d) || validAdminLog(d));
+    }
+
+    match /auditLogs/{logId} {
+      // 管理員看全部；一般使用者只能看自己做的事（個人資料頁的帳號活動）
+      allow read: if isAdmin() || (signedIn() && resource.data.actorUid == request.auth.uid);
+      allow create: if validLogCreate();
+      allow update, delete: if false;
     }
 
     // 台股分析的投資組合（沿用原台股分析專案的規則）：只能存取自己的文件。

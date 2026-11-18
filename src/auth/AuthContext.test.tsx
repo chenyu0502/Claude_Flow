@@ -32,6 +32,8 @@ vi.mock('../services/auth', async (importOriginal) => {
     sendVerificationEmail: vi.fn(),
   };
 });
+const auditLog = vi.hoisted(() => ({ logSelfEvent: vi.fn() }));
+vi.mock('../services/auditLog', () => auditLog);
 vi.mock('../services/users', () => ({
   ensureUserProfile: vi.fn(),
   subscribeUserProfile: vi.fn(),
@@ -87,6 +89,7 @@ const emitAuth = (u: User | null) =>
 beforeEach(() => {
   vi.clearAllMocks();
   fbAuth.currentUser = null;
+  auditLog.logSelfEvent.mockResolvedValue(undefined);
   authListener = null;
   subs = {};
   users.ensureUserProfile.mockResolvedValue(undefined);
@@ -332,5 +335,98 @@ describe('Email 驗證狀態', () => {
       await ctx.resendVerificationEmail();
     });
     expect(svc.sendVerificationEmail).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('登入紀錄', () => {
+  it('主動登入成功後記一筆 login，帶上登入方式', async () => {
+    setup();
+    svc.signInWithGoogle.mockResolvedValue({} as User);
+    svc.signInWithEmail.mockResolvedValue({} as User);
+    await act(async () => {
+      await ctx.signInWithGoogle();
+      await ctx.signInWithEmail('a@x.tw', 'pw1234');
+    });
+    expect(auditLog.logSelfEvent).toHaveBeenCalledWith('login', { method: 'google.com' });
+    expect(auditLog.logSelfEvent).toHaveBeenCalledWith('login', { method: 'password' });
+  });
+
+  it('登入失敗不記', async () => {
+    setup();
+    svc.signInWithGithub.mockRejectedValue(new Error('x'));
+    await act(async () => {
+      await ctx.signInWithGithub().catch(() => {});
+    });
+    expect(auditLog.logSelfEvent).not.toHaveBeenCalled();
+  });
+
+  it('重新整理頁面時自動恢復登入狀態不算登入', async () => {
+    setup();
+    await emitAuth(makeUser('a'));
+    expect(auditLog.logSelfEvent).not.toHaveBeenCalled();
+  });
+
+  it('註冊記一筆 register', async () => {
+    setup();
+    svc.signUpWithEmail.mockResolvedValue({} as User);
+    await act(async () => {
+      await ctx.signUpWithEmail('n@x.tw', 'pw1234', 'N');
+    });
+    expect(auditLog.logSelfEvent).toHaveBeenCalledWith('register', { method: 'password' });
+  });
+
+  it('登出前先記 logout，再登出', async () => {
+    setup();
+    const order: string[] = [];
+    auditLog.logSelfEvent.mockImplementation(async () => {
+      order.push('log');
+    });
+    svc.signOutUser.mockImplementation(async () => {
+      order.push('signOut');
+    });
+    await act(async () => {
+      await ctx.signOut();
+    });
+    expect(auditLog.logSelfEvent).toHaveBeenCalledWith('logout', {});
+    expect(order).toEqual(['log', 'signOut']);
+  });
+
+  it('日誌寫入卡住（離線）時，最多等 1.5 秒就照常登出', async () => {
+    vi.useFakeTimers();
+    try {
+      setup();
+      auditLog.logSelfEvent.mockReturnValue(new Promise(() => {}));
+      let done = false;
+      void ctx.signOut().then(() => {
+        done = true;
+      });
+      await vi.advanceTimersByTimeAsync(1499);
+      expect(svc.signOutUser).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(svc.signOutUser).toHaveBeenCalled();
+      await vi.waitFor(() => expect(done).toBe(true));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('這次檢查才完成 Email 驗證時記一筆 email_verified，之後不重複記', async () => {
+    setup();
+    const u = {
+      uid: 'p',
+      emailVerified: false,
+      providerData: [{ providerId: 'password' }],
+      reload: vi.fn(async () => {
+        (u as { emailVerified: boolean }).emailVerified = true;
+      }),
+      getIdToken: vi.fn().mockResolvedValue('t'),
+    };
+    fbAuth.currentUser = u;
+    await emitAuth(u as unknown as User);
+    await act(async () => {
+      await ctx.refreshEmailVerification();
+      await ctx.refreshEmailVerification();
+    });
+    expect(auditLog.logSelfEvent.mock.calls.filter(([t]) => t === 'email_verified')).toHaveLength(1);
   });
 });

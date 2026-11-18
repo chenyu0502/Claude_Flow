@@ -61,6 +61,16 @@ async function ensureAuthUser({ email, displayName }) {
   return signIn.json.localId;
 }
 
+/**
+ * 把帳號標成已驗證 Email。測試帳號是 Email/密碼帳號，沒驗證的話會被擋在驗證提示頁
+ * （見 src/auth/emailVerification.ts）。Bearer owner 讓 Emulator 以管理者身分更新。
+ */
+async function markEmailVerified(uid, email) {
+  const url = `${AUTH_HOST}/identitytoolkit.googleapis.com/v1/projects/${PROJECT_ID}/accounts:update`;
+  const res = await postJson(url, { localId: uid, emailVerified: true }, { Authorization: 'Bearer owner' });
+  if (!res.ok) throw new Error(`標記 ${email} 為已驗證失敗：${JSON.stringify(res.json)}`);
+}
+
 /** 寫入 users/{uid}；Bearer owner 讓 Emulator 繞過 Security Rules */
 async function writeUserDoc(uid, { email, displayName, role }) {
   const now = new Date().toISOString();
@@ -91,6 +101,7 @@ async function main() {
   console.log(`Seeding Emulator（project ${PROJECT_ID}）…`);
   for (const account of ACCOUNTS) {
     const uid = await ensureAuthUser(account);
+    await markEmailVerified(uid, account.email);
     await writeUserDoc(uid, account);
   }
   console.log(`完成。登入密碼：${PASSWORD}`);

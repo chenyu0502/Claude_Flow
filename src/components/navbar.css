@@ -67,7 +67,8 @@ img.avatar { flex-shrink: 0; }
   .navbar-sep { margin: 0 2px; }
 }
 
-@media (max-width: 380px) {
+/* 手機直向：管理員的導覽列有五個圖示，品牌文字只留圖示才放得下 */
+@media (max-width: 430px) {
   .navbar-wordmark {
     position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
     overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;

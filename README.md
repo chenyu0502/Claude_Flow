@@ -6,6 +6,7 @@
 - 個人資料：編輯顯示名稱與頭像、綁定/解除登入方式；有設定密碼的帳號可修改密碼（需先輸入目前的密碼）
 - **Email 驗證**：只用 Email/密碼註冊的帳號要先點驗證信連結，才能使用各項功能。主站守衛、`/stock/`、`/interior/`、`/api/*` 與 Firestore 規則（`portfolios`）都會檢查，判斷邏輯一致（`src/auth/emailVerification.ts`）。Google、GitHub 登入不受影響
 - 管理員後台（`/admin/users`）：搜尋、篩選、調整角色、停用帳號
+- **登入紀錄與操作日誌**（Firestore `auditLogs`）：登入、登出、註冊、改密碼、綁定／解除登入方式、修改個人資料、管理員調整角色與停用帳號。管理員在 `/admin/logs` 看全部；每個人在個人資料頁看自己最近 10 筆
 - **台股分析（`/stock/`，所有登入的使用者）**：持股、績效、個股分析與 AI 解讀，由原「台股分析」專案併入；每個人的持股彼此看不到，AI 解讀需填自己的 Gemini API Key
 - 權限由 Firestore Security Rules 把關（見 `firestore.rules`，規格見 `CONTRACTS.md`）
 
@@ -55,7 +56,7 @@ npm run typecheck
 
 沿用原台股分析的 Firebase 專案，你用同一個 Google 帳號登入就會看到原本的持股。
 
-1. **發布規則**：`firestore.rules` 已包含 `myfirebase-22090` 上全部三段規則（`users`、`portfolios`，以及台股損益存摺 HanDan 手機端用的 `handan`，2026-11-12 從 Console 併入）。把整份貼到 Console → Firestore → 規則 發布，或執行 `npx firebase deploy --only firestore:rules --project myfirebase-22090`。之後改規則一律改這個檔案，不要只在 Console 上改，否則下次部署會被覆蓋。
+1. **發布規則與索引**：規則見下；個人資料頁的「帳號活動」需要 `auditLogs`（`actorUid` + `createdAt`）的複合索引，定義在 `firestore.indexes.json`，用 `npx firebase deploy --only firestore --project myfirebase-22090` 會一起建立。**規則**：`firestore.rules` 已包含 `myfirebase-22090` 上全部三段規則（`users`、`portfolios`，以及台股損益存摺 HanDan 手機端用的 `handan`，2026-11-12 從 Console 併入）。把整份貼到 Console → Firestore → 規則 發布，或執行 `npx firebase deploy --only firestore:rules --project myfirebase-22090`。之後改規則一律改這個檔案，不要只在 Console 上改，否則下次部署會被覆蓋。
 2. **Authentication → Sign-in method**：Google 已啟用；要用 Email/密碼或 GitHub 再另外啟用（GitHub 需先到 GitHub → Settings → Developer settings → OAuth Apps 新建，Callback URL 填 `https://myfirebase-22090.firebaseapp.com/__/auth/handler`）。
 3. **Authentication → Settings → Authorized domains**：加入 Claude Flow 的 Vercel 網域。
 4. **Vercel**：匯入 GitHub repo，框架選 Vite，環境變數必填 `VITE_FIREBASE_*`（`VITE_USE_EMULATOR=false`），選填 `FINMIND_TOKEN`（基本面、法人歷史、產業分類）與 `GEMINI_API_KEY`（只供管理員沒填自己的金鑰時備用）、`GEMINI_MODEL`。`vercel.json` 已設定好 `/stock/` 與 SPA 的轉址規則、API 路徑排除，以及 `/assets/` 的長期快取（檔名帶內容雜湊，改版就換檔名；唯一不帶雜湊的 `interior-gate.js` 排除在外，以免使用者一直拿到舊版登入檢查）。
@@ -64,6 +65,8 @@ npm run typecheck
 原台股分析網站（tw-stock-analysis.vercel.app）與這裡讀寫同一份 `portfolios` 資料，可以並行使用，確認新版沒問題再停用。
 
 ## 已知限制
+
+- **日誌由前端寫入**（Spark 方案沒有 Cloud Functions）：規則保證只能記自己的事、時間由伺服器決定、寫入後不能改也不能刪，管理員操作必須和實際變更同一批次寫入。但無法保證「每件事都有記」——有人直接呼叫 Firestore API 就能略過記錄；登入失敗（還沒有登入憑證）與 IP 位址也記不到。要做到完整稽核需要 Cloud Functions（Blaze 方案）。日誌不會自動刪除。
 
 - **停用只在應用層生效**：被停用的人仍能透過 Firebase Auth 登入，但會被守衛攔在停用提示頁，也無法寫入資料。要真正封鎖登入需 Admin SDK（Cloud Functions，需 Blaze 方案）。
 - Firebase 預設「一個 email 一個帳號」：先用 Email/密碼註冊、後用同 email 的 Google 登入時，Google 作為可信提供方會取代未驗證的密碼登入方式（Firebase 本身的行為）。

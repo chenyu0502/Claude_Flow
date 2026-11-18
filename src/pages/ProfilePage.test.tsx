@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import type { AuthContextValue } from '../auth/AuthContext';
@@ -21,6 +21,14 @@ const authSvc = vi.hoisted(() => ({
   isUserCancelled: vi.fn(() => false),
 }));
 vi.mock('../services/auth', () => authSvc);
+
+const auditLog = vi.hoisted(() => ({
+  logSelfEvent: vi.fn(),
+  subscribeOwnLogs: vi.fn(),
+  describeDetail: (l: { detail: { method?: string } }) => l.detail.method ?? '',
+  AUDIT_TYPE_LABELS: { login: '登入', logout: '登出' },
+}));
+vi.mock('../services/auditLog', () => auditLog);
 
 const fb = vi.hoisted(() => ({ auth: { currentUser: null as unknown } }));
 vi.mock('../lib/firebase', () => fb);
@@ -72,6 +80,8 @@ beforeEach(() => {
   users.updateOwnProfile.mockResolvedValue(undefined);
   users.ensureUserProfile.mockResolvedValue(undefined);
   authSvc.isUserCancelled.mockReturnValue(false);
+  auditLog.logSelfEvent.mockResolvedValue(undefined);
+  auditLog.subscribeOwnLogs.mockReturnValue(() => {});
 });
 
 describe('validateProfile', () => {
@@ -211,5 +221,81 @@ describe('修改密碼', () => {
     setup(['password']);
     await fillAndSubmit('wrong1', 'new123', 'new123');
     expect(await screen.findByRole('alert')).toHaveTextContent('操作失敗');
+  });
+});
+
+describe('操作紀錄', () => {
+  it('改密碼成功記 password_change', async () => {
+    authSvc.changePassword.mockResolvedValue(undefined);
+    setup(['password']);
+    await userEvent.type(screen.getByLabelText('目前的密碼'), 'old123');
+    await userEvent.type(screen.getByLabelText('新密碼'), 'new123');
+    await userEvent.type(screen.getByLabelText('再次輸入新密碼'), 'new123');
+    await userEvent.click(screen.getByRole('button', { name: '更新密碼' }));
+    await screen.findByText('密碼已更新');
+    expect(auditLog.logSelfEvent).toHaveBeenCalledWith('password_change', {});
+  });
+
+  it('改密碼失敗不記', async () => {
+    authSvc.changePassword.mockRejectedValue(new Error('x'));
+    setup(['password']);
+    await userEvent.type(screen.getByLabelText('目前的密碼'), 'old123');
+    await userEvent.type(screen.getByLabelText('新密碼'), 'new123');
+    await userEvent.type(screen.getByLabelText('再次輸入新密碼'), 'new123');
+    await userEvent.click(screen.getByRole('button', { name: '更新密碼' }));
+    await screen.findByRole('alert');
+    expect(auditLog.logSelfEvent).not.toHaveBeenCalled();
+  });
+
+  it('儲存個人資料只記有變的欄位；沒改就不記', async () => {
+    setup(['google.com']);
+    await userEvent.click(screen.getByRole('button', { name: '儲存' }));
+    await screen.findByText('已儲存');
+    expect(auditLog.logSelfEvent).not.toHaveBeenCalled();
+
+    const name = screen.getByLabelText('顯示名稱');
+    await userEvent.clear(name);
+    await userEvent.type(name, 'Bob');
+    await userEvent.click(screen.getByRole('button', { name: '儲存' }));
+    await waitFor(() =>
+      expect(auditLog.logSelfEvent).toHaveBeenCalledWith('profile_update', { fields: ['displayName'] }),
+    );
+  });
+
+  it('綁定成功記 provider_link', async () => {
+    authSvc.linkProvider.mockResolvedValue({});
+    setup(['password']);
+    await userEvent.click(screen.getAllByRole('button', { name: '綁定' })[0]);
+    await waitFor(() => expect(auditLog.logSelfEvent).toHaveBeenCalledWith('provider_link', { provider: 'google.com' }));
+  });
+});
+
+describe('帳號活動', () => {
+  type Cb = (logs: unknown[]) => void;
+  const lastCallback = (): Cb => auditLog.subscribeOwnLogs.mock.calls.at(-1)![2] as Cb;
+
+  it('訂閱自己的紀錄並列出', async () => {
+    setup(['google.com']);
+    expect(auditLog.subscribeOwnLogs).toHaveBeenCalledWith('u1', 10, expect.any(Function), expect.any(Function));
+    expect(screen.getByText('載入中…')).toBeInTheDocument();
+    act(() =>
+      lastCallback()([
+        {
+          id: 'l1',
+          type: 'login',
+          detail: { method: 'Google' },
+          device: 'Chrome · Windows',
+          createdAt: { toDate: () => new Date(2026, 10, 18, 9, 30) },
+        },
+      ]),
+    );
+    expect(screen.getByText('登入')).toBeInTheDocument();
+    expect(screen.getByText(/Chrome · Windows/)).toBeInTheDocument();
+  });
+
+  it('沒有紀錄時顯示提示', () => {
+    setup(['google.com']);
+    act(() => lastCallback()([]));
+    expect(screen.getByText('還沒有紀錄')).toBeInTheDocument();
   });
 });

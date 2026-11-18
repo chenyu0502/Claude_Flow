@@ -1,12 +1,19 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import type { Timestamp } from 'firebase/firestore';
-import { KeyRound, LockKeyhole, Mail, PenLine } from 'lucide-react';
+import { History, KeyRound, LockKeyhole, Mail, PenLine } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { Avatar } from '../components/NavBar';
 import { GithubIcon, GoogleIcon } from '../components/OAuthButtons';
 import { auth } from '../lib/firebase';
 import { authErrorMessage, changePassword, isUserCancelled, linkProvider, unlinkProvider } from '../services/auth';
 import { PASSWORD_MIN } from './RegisterPage';
+import {
+  AUDIT_TYPE_LABELS,
+  describeDetail,
+  logSelfEvent,
+  subscribeOwnLogs,
+  type AuditLog,
+} from '../services/auditLog';
 import { ensureUserProfile, updateOwnProfile } from '../services/users';
 import { PROVIDER_LABELS, SUPPORTED_PROVIDERS, type ProviderId } from '../types/user';
 import './profile.css';
@@ -50,6 +57,70 @@ export function validatePasswordChange(current: string, next: string, confirm: s
   return null;
 }
 
+/** 帳號活動顯示的筆數 */
+export const ACTIVITY_LIMIT = 10;
+
+/** 自己最近的帳號活動：登入、登出、改密碼等，可以發現不是自己做的操作 */
+function ActivitySection({ uid }: { uid: string }) {
+  const [logs, setLogs] = useState<AuditLog[] | null>(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    setLogs(null);
+    setError(false);
+    return subscribeOwnLogs(
+      uid,
+      ACTIVITY_LIMIT,
+      (next) => setLogs(next),
+      (err) => {
+        console.error('[ProfilePage] 讀取帳號活動失敗', err);
+        setError(true);
+      },
+    );
+  }, [uid]);
+
+  return (
+    <section className="card">
+      <div className="section-title">
+        <span className="icon-tile sage">
+          <History size={20} aria-hidden="true" />
+        </span>
+        <div>
+          <h2>帳號活動</h2>
+          <p className="muted">最近 {ACTIVITY_LIMIT} 筆。看到不是自己做的操作，請立刻修改密碼或解除可疑的登入方式。</p>
+        </div>
+      </div>
+      {error ? (
+        <div className="alert alert-error" role="alert">
+          無法讀取帳號活動，請稍後再試
+        </div>
+      ) : logs === null ? (
+        <p className="muted">載入中…</p>
+      ) : logs.length === 0 ? (
+        <p className="muted">還沒有紀錄</p>
+      ) : (
+        <ul className="activity-list">
+          {logs.map((log) => {
+            const detail = describeDetail(log);
+            return (
+              <li key={log.id} className="activity-item">
+                <span className="activity-main">
+                  <strong>{AUDIT_TYPE_LABELS[log.type]}</strong>
+                  {detail && <span className="muted">{detail}</span>}
+                </span>
+                <span className="activity-meta muted">
+                  {formatTimestamp(log.createdAt)}
+                  {log.device && ` · ${log.device}`}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 /** 修改密碼（只有綁定了 Email/密碼的帳號才會顯示） */
 function ChangePasswordSection() {
   const [current, setCurrent] = useState('');
@@ -69,6 +140,7 @@ function ChangePasswordSection() {
     setBusy(true);
     try {
       await changePassword(current, next);
+      void logSelfEvent('password_change', {});
       setCurrent('');
       setNext('');
       setConfirm('');
@@ -183,8 +255,14 @@ export default function ProfilePage() {
     }
     setSaving(true);
     try {
-      const url = photoURL.trim();
-      await updateOwnProfile(uid, { displayName: displayName.trim(), photoURL: url || null });
+      const name = displayName.trim();
+      const url = photoURL.trim() || null;
+      // 只記真的有變的欄位；什麼都沒改就按儲存不記。
+      const changed: ('displayName' | 'photoURL')[] = [];
+      if (name !== (profile?.displayName ?? '')) changed.push('displayName');
+      if (url !== (profile?.photoURL ?? null)) changed.push('photoURL');
+      await updateOwnProfile(uid, { displayName: name, photoURL: url });
+      if (changed.length > 0) void logSelfEvent('profile_update', { fields: changed });
       setSaveMsg({ kind: 'success', text: '已儲存' });
     } catch (saveErr) {
       setSaveMsg({ kind: 'error', text: authErrorMessage(saveErr) });
@@ -217,9 +295,23 @@ export default function ProfilePage() {
   }
 
   const handleLink = (id: Exclude<ProviderId, 'password'>) =>
-    runProviderAction(id, () => linkProvider(id), `已綁定 ${PROVIDER_LABELS[id]}`);
+    runProviderAction(
+      id,
+      async () => {
+        await linkProvider(id);
+        void logSelfEvent('provider_link', { provider: id });
+      },
+      `已綁定 ${PROVIDER_LABELS[id]}`,
+    );
   const handleUnlink = (id: ProviderId) =>
-    runProviderAction(id, () => unlinkProvider(id), `已解除 ${PROVIDER_LABELS[id]}`);
+    runProviderAction(
+      id,
+      async () => {
+        await unlinkProvider(id);
+        void logSelfEvent('provider_unlink', { provider: id });
+      },
+      `已解除 ${PROVIDER_LABELS[id]}`,
+    );
 
   const onlyOne = linked.length <= 1;
   const headerName = profile.displayName || profile.email || user.email;
@@ -349,6 +441,8 @@ export default function ProfilePage() {
       </section>
 
       {linked.includes('password') && <ChangePasswordSection />}
+
+      <ActivitySection uid={uid} />
       </div>
     </div>
   );

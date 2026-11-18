@@ -17,6 +17,7 @@ import * as authService from '../services/auth';
 import { AccountExistsWithDifferentCredentialError } from '../services/auth';
 import { ensureUserProfile, subscribeUserProfile, updateOwnProfile } from '../services/users';
 import { needsEmailVerification as computeNeedsVerification } from './emailVerification';
+import { logSelfEvent } from '../services/auditLog';
 
 export interface AuthContextValue {
   /** Firebase Auth 使用者；未登入為 null */
@@ -45,6 +46,9 @@ export interface AuthContextValue {
 
 export const AuthContext = createContext<AuthContextValue | null>(null);
 
+/** 登出前等日誌寫入的上限：離線時寫入會一直等伺服器回應，不能讓登出卡住 */
+const LOGOUT_LOG_TIMEOUT_MS = 1500;
+
 /** 衝突錯誤未帶 email 時用於提示的佔位文字 */
 const UNKNOWN_EMAIL = '該 email';
 
@@ -55,6 +59,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [pendingLinkEmail, setPendingLinkEmail] = useState<string | null>(null);
   /** emailVerified 存在 User 物件上，reload 後物件引用不變，另存一份才會觸發重繪 */
   const [needsEmailVerification, setNeedsEmailVerification] = useState(false);
+  /** 同一個值的 ref 版本：refreshEmailVerification 用它判斷「這次才完成驗證」，不受閉包舊值影響 */
+  const needsVerificationRef = useRef(false);
 
   /** 待綁定的憑證（不放 state，避免觸發渲染，也避免閉包拿到舊值） */
   const pendingCredRef = useRef<AuthCredential | null>(null);
@@ -134,7 +140,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       stopProfile();
       setProfile(null);
       setUser(firebaseUser);
-      setNeedsEmailVerification(computeNeedsVerification(firebaseUser));
+      needsVerificationRef.current = computeNeedsVerification(firebaseUser);
+      setNeedsEmailVerification(needsVerificationRef.current);
       if (!firebaseUser) {
         setLoading(false);
         return;
@@ -163,16 +170,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const signInWithGoogle = useCallback(
-    () => withConflictCapture(() => authService.signInWithGoogle()),
-    [withConflictCapture],
-  );
-  const signInWithGithub = useCallback(
-    () => withConflictCapture(() => authService.signInWithGithub()),
-    [withConflictCapture],
-  );
+  // 登入紀錄只在「使用者主動登入」時寫，重新整理頁面時自動恢復登入狀態不算一次登入。
+  // 日誌寫入不 await：失敗只記 console，不能拖慢或擋住登入。
+  const signInWithGoogle = useCallback(async () => {
+    await withConflictCapture(() => authService.signInWithGoogle());
+    void logSelfEvent('login', { method: 'google.com' });
+  }, [withConflictCapture]);
+  const signInWithGithub = useCallback(async () => {
+    await withConflictCapture(() => authService.signInWithGithub());
+    void logSelfEvent('login', { method: 'github.com' });
+  }, [withConflictCapture]);
   const signInWithEmail = useCallback(
-    (email: string, password: string) => withConflictCapture(() => authService.signInWithEmail(email, password)),
+    async (email: string, password: string) => {
+      await withConflictCapture(() => authService.signInWithEmail(email, password));
+      void logSelfEvent('login', { method: 'password' });
+    },
     [withConflictCapture],
   );
   const signUpWithEmail = useCallback(
@@ -184,6 +196,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         pendingDisplayNameRef.current = null;
         throw err;
       }
+      void logSelfEvent('register', { method: 'password' });
     },
     [withConflictCapture],
   );
@@ -198,6 +211,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // 換一張新的 ID token：舊 token 裡的 email_verified 還是 false，
     // 不換的話 API 與 Firestore 規則要等到 token 自然到期（最長一小時）才會放行。
     if (!stillNeeds) await fresh.getIdToken(true);
+    // 只在「這次檢查才變成已驗證」時記一筆，已驗證過的帳號重複檢查不重複記。
+    if (needsVerificationRef.current && !stillNeeds) {
+      void logSelfEvent('email_verified', {});
+    }
+    needsVerificationRef.current = stillNeeds;
     setNeedsEmailVerification(stillNeeds);
     return !stillNeeds;
   }, []);
@@ -205,6 +223,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     pendingCredRef.current = null;
     pendingDisplayNameRef.current = null;
     setPendingLinkEmail(null);
+    // 登出要在登出前記：登出後就沒有登入憑證，規則不允許寫入。
+    await Promise.race([
+      logSelfEvent('logout', {}),
+      new Promise((resolve) => setTimeout(resolve, LOGOUT_LOG_TIMEOUT_MS)),
+    ]);
     await authService.signOutUser();
   }, []);
 

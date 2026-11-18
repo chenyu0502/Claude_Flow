@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
-import { LogOut, Sofa, TrendingUp, Users } from 'lucide-react';
+import { History, LogOut, Sofa, TrendingUp, Users } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import BrandMark from './BrandMark';
 import StyleToggle from './StyleToggle';
@@ -80,9 +80,14 @@ export default function NavBar() {
                   <NavItem icon={<TrendingUp size={iconSize} aria-hidden="true" />} label="台股分析" />
                 </a>
                 {isAdmin && (
-                  <NavLink to="/admin/users" className={navClass}>
-                    <NavItem icon={<Users size={iconSize} aria-hidden="true" />} label="使用者管理" />
-                  </NavLink>
+                  <>
+                    <NavLink to="/admin/users" className={navClass}>
+                      <NavItem icon={<Users size={iconSize} aria-hidden="true" />} label="使用者管理" />
+                    </NavLink>
+                    <NavLink to="/admin/logs" className={navClass}>
+                      <NavItem icon={<History size={iconSize} aria-hidden="true" />} label="操作日誌" />
+                    </NavLink>
+                  </>
                 )}
               </div>
               <span className="navbar-sep" aria-hidden="true" />
