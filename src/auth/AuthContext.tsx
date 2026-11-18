@@ -16,6 +16,7 @@ import { auth } from '../lib/firebase';
 import * as authService from '../services/auth';
 import { AccountExistsWithDifferentCredentialError } from '../services/auth';
 import { ensureUserProfile, subscribeUserProfile, updateOwnProfile } from '../services/users';
+import { needsEmailVerification as computeNeedsVerification } from './emailVerification';
 
 export interface AuthContextValue {
   /** Firebase Auth 使用者；未登入為 null */
@@ -26,6 +27,8 @@ export interface AuthContextValue {
   loading: boolean;
   isAdmin: boolean;
   isDisabled: boolean;
+  /** 只用 Email/密碼登入且尚未驗證信箱；為 true 時守衛會擋住需要登入的頁面 */
+  needsEmailVerification: boolean;
   /** 有待綁定的憑證時為衝突的 email，頁面可提示「請用原本方式登入以完成綁定」 */
   pendingLinkEmail: string | null;
   signInWithGoogle(): Promise<void>;
@@ -33,6 +36,10 @@ export interface AuthContextValue {
   signInWithEmail(email: string, password: string): Promise<void>;
   signUpWithEmail(email: string, password: string, displayName: string): Promise<void>;
   resetPassword(email: string): Promise<void>;
+  /** 重新寄送 Email 驗證信 */
+  resendVerificationEmail(): Promise<void>;
+  /** 重新讀取驗證狀態（使用者點了信中連結之後）；回傳是否已完成驗證 */
+  refreshEmailVerification(): Promise<boolean>;
   signOut(): Promise<void>;
 }
 
@@ -46,6 +53,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [pendingLinkEmail, setPendingLinkEmail] = useState<string | null>(null);
+  /** emailVerified 存在 User 物件上，reload 後物件引用不變，另存一份才會觸發重繪 */
+  const [needsEmailVerification, setNeedsEmailVerification] = useState(false);
 
   /** 待綁定的憑證（不放 state，避免觸發渲染，也避免閉包拿到舊值） */
   const pendingCredRef = useRef<AuthCredential | null>(null);
@@ -125,6 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       stopProfile();
       setProfile(null);
       setUser(firebaseUser);
+      setNeedsEmailVerification(computeNeedsVerification(firebaseUser));
       if (!firebaseUser) {
         setLoading(false);
         return;
@@ -178,6 +188,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [withConflictCapture],
   );
   const resetPassword = useCallback((email: string) => authService.sendResetEmail(email), []);
+  const resendVerificationEmail = useCallback(() => authService.sendVerificationEmail(), []);
+  const refreshEmailVerification = useCallback(async () => {
+    const current = auth.currentUser;
+    if (!current) return false;
+    await current.reload();
+    const fresh = auth.currentUser ?? current;
+    const stillNeeds = computeNeedsVerification(fresh);
+    // 換一張新的 ID token：舊 token 裡的 email_verified 還是 false，
+    // 不換的話 API 與 Firestore 規則要等到 token 自然到期（最長一小時）才會放行。
+    if (!stillNeeds) await fresh.getIdToken(true);
+    setNeedsEmailVerification(stillNeeds);
+    return !stillNeeds;
+  }, []);
   const signOut = useCallback(async () => {
     pendingCredRef.current = null;
     pendingDisplayNameRef.current = null;
@@ -192,24 +215,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       isAdmin: profile?.role === 'admin' && !profile.disabled,
       isDisabled: profile?.disabled === true,
+      needsEmailVerification,
       pendingLinkEmail,
       signInWithGoogle,
       signInWithGithub,
       signInWithEmail,
       signUpWithEmail,
       resetPassword,
+      resendVerificationEmail,
+      refreshEmailVerification,
       signOut,
     }),
     [
       user,
       profile,
       loading,
+      needsEmailVerification,
       pendingLinkEmail,
       signInWithGoogle,
       signInWithGithub,
       signInWithEmail,
       signUpWithEmail,
       resetPassword,
+      resendVerificationEmail,
+      refreshEmailVerification,
       signOut,
     ],
   );

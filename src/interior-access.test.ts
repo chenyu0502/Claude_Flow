@@ -3,6 +3,8 @@ import { decideInteriorAccess, isPublicShareView } from './interior-access';
 import type { UserProfile } from './types/user';
 
 const profile = (disabled: boolean) => ({ uid: 'u', role: 'user', disabled }) as UserProfile;
+const googleUser = { emailVerified: true, providerData: [{ providerId: 'google.com' }] };
+const unverifiedPasswordUser = { emailVerified: false, providerData: [{ providerId: 'password' }] };
 
 describe('isPublicShareView', () => {
   it('唯讀分享連結（#share= 與 ?g=）不需要登入', () => {
@@ -19,22 +21,32 @@ describe('isPublicShareView', () => {
 
 describe('decideInteriorAccess', () => {
   it('未登入 → 導向登入頁', () => {
-    expect(decideInteriorAccess(false, undefined)).toBe('login');
+    expect(decideInteriorAccess(null, undefined)).toBe('login');
   });
 
   it('已登入但使用者資料還在讀取 → 保持隱藏', () => {
-    expect(decideInteriorAccess(true, undefined)).toBeNull();
+    expect(decideInteriorAccess(googleUser, undefined)).toBeNull();
   });
 
   it('已登入且未停用 → 可以使用（不限管理員）', () => {
-    expect(decideInteriorAccess(true, profile(false))).toBe('allow');
+    expect(decideInteriorAccess(googleUser, profile(false))).toBe('allow');
   });
 
   it('帳號已停用 → 停用提示', () => {
-    expect(decideInteriorAccess(true, profile(true))).toBe('disabled');
+    expect(decideInteriorAccess(googleUser, profile(true))).toBe('disabled');
   });
 
   it('沒有 Claude Flow 使用者資料 → 提示先從 Claude Flow 登入', () => {
-    expect(decideInteriorAccess(true, null)).toBe('no-profile');
+    expect(decideInteriorAccess(googleUser, null)).toBe('no-profile');
+  });
+
+  it('Email/密碼註冊但未驗證信箱 → 驗證提示，不必等使用者資料', () => {
+    expect(decideInteriorAccess(unverifiedPasswordUser, undefined)).toBe('unverified');
+    expect(decideInteriorAccess(unverifiedPasswordUser, profile(false))).toBe('unverified');
+  });
+
+  it('已驗證信箱的 Email/密碼帳號 → 可以使用', () => {
+    const verified = { ...unverifiedPasswordUser, emailVerified: true };
+    expect(decideInteriorAccess(verified, profile(false))).toBe('allow');
   });
 });

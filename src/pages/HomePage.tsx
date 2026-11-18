@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, ShieldCheck, Sofa, TrendingUp, UserRound, Users } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
+import { VerifyEmailNotice } from '../auth/guards';
 import { formatTimestamp } from './ProfilePage';
 import './profile.css';
 
@@ -52,7 +53,7 @@ function AppCard({ href, external, icon, tone = '', title, description, tag }: A
 }
 
 export default function HomePage() {
-  const { user, profile, loading, isAdmin } = useAuth();
+  const { user, profile, loading, isAdmin, needsEmailVerification } = useAuth();
 
   if (loading) {
     return <div className="spinner-page">載入中…</div>;
@@ -103,6 +104,9 @@ export default function HomePage() {
       </div>
     );
   }
+
+  // Email 註冊完會被導回首頁：還沒驗證信箱就先顯示驗證提示，不顯示各功能入口。
+  if (needsEmailVerification) return <VerifyEmailNotice />;
 
   const name = profile?.displayName ?? user.displayName ?? user.email ?? '使用者';
 

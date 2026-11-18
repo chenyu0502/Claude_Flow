@@ -10,7 +10,8 @@ import { AccountExistsWithDifferentCredentialError } from '../services/auth';
 let authListener: ((u: User | null) => void) | null = null;
 const authUnsub = vi.fn();
 
-vi.mock('../lib/firebase', () => ({ auth: {} }));
+const fbAuth = vi.hoisted(() => ({ currentUser: null as unknown }));
+vi.mock('../lib/firebase', () => ({ auth: fbAuth }));
 vi.mock('firebase/auth', () => ({
   onAuthStateChanged: (_auth: unknown, cb: (u: User | null) => void) => {
     authListener = cb;
@@ -28,6 +29,7 @@ vi.mock('../services/auth', async (importOriginal) => {
     sendResetEmail: vi.fn(),
     signOutUser: vi.fn(),
     linkPendingCredential: vi.fn(),
+    sendVerificationEmail: vi.fn(),
   };
 });
 vi.mock('../services/users', () => ({
@@ -84,6 +86,7 @@ const emitAuth = (u: User | null) =>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  fbAuth.currentUser = null;
   authListener = null;
   subs = {};
   users.ensureUserProfile.mockResolvedValue(undefined);
@@ -270,5 +273,64 @@ describe('帳號衝突 pending link 流程', () => {
     });
     expect(thrown).toBe(err);
     expect(text('pending')).toBe('none');
+  });
+});
+
+describe('Email 驗證狀態', () => {
+  const passwordUser = (emailVerified: boolean) =>
+    ({
+      uid: 'p',
+      emailVerified,
+      providerData: [{ providerId: 'password' }],
+      reload: vi.fn().mockResolvedValue(undefined),
+      getIdToken: vi.fn().mockResolvedValue('t'),
+    }) as unknown as User & { reload: ReturnType<typeof vi.fn>; getIdToken: ReturnType<typeof vi.fn> };
+
+  it('Email/密碼未驗證 → needsEmailVerification 為 true；Google 帳號為 false', async () => {
+    setup();
+    await emitAuth(passwordUser(false));
+    expect(ctx.needsEmailVerification).toBe(true);
+    await emitAuth({ uid: 'g', emailVerified: true, providerData: [{ providerId: 'google.com' }] } as unknown as User);
+    expect(ctx.needsEmailVerification).toBe(false);
+  });
+
+  it('refreshEmailVerification：驗證完成後換新 token 並解除', async () => {
+    setup();
+    const u = passwordUser(false);
+    fbAuth.currentUser = u;
+    await emitAuth(u);
+    u.reload.mockImplementation(async () => {
+      (u as { emailVerified: boolean }).emailVerified = true;
+    });
+    let verified = false;
+    await act(async () => {
+      verified = await ctx.refreshEmailVerification();
+    });
+    expect(verified).toBe(true);
+    expect(u.getIdToken).toHaveBeenCalledWith(true);
+    expect(ctx.needsEmailVerification).toBe(false);
+  });
+
+  it('refreshEmailVerification：還沒驗證 → 回傳 false，不換 token', async () => {
+    setup();
+    const u = passwordUser(false);
+    fbAuth.currentUser = u;
+    await emitAuth(u);
+    let verified = true;
+    await act(async () => {
+      verified = await ctx.refreshEmailVerification();
+    });
+    expect(verified).toBe(false);
+    expect(u.getIdToken).not.toHaveBeenCalled();
+    expect(ctx.needsEmailVerification).toBe(true);
+  });
+
+  it('resendVerificationEmail 呼叫服務層寄信', async () => {
+    setup();
+    svc.sendVerificationEmail.mockResolvedValue(undefined);
+    await act(async () => {
+      await ctx.resendVerificationEmail();
+    });
+    expect(svc.sendVerificationEmail).toHaveBeenCalledTimes(1);
   });
 });

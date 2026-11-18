@@ -19,6 +19,7 @@ function reveal() {
 const NOTICES: Record<Exclude<InteriorAccess, 'allow' | 'login'>, { title: string; body: string }> = {
   disabled: { title: '帳號已停用', body: '你的帳號已被停用，請聯絡管理員。' },
   'no-profile': { title: '請先登入 Claude Flow', body: '請從 Claude Flow 首頁登入後，再開啟室內設計。' },
+  unverified: { title: '請先驗證 Email', body: '請到信箱點驗證信中的連結，完成後回 Claude Flow 首頁再開啟室內設計。' },
 };
 
 /** 以 Claude Flow 的提示取代整個頁面（室內設計的介面已經建好，直接換掉 body）。 */
@@ -50,13 +51,18 @@ if (isPublicShareView(window.location)) {
     unsubscribeProfile?.();
     unsubscribeProfile = null;
     if (!user) {
-      apply(decideInteriorAccess(false, undefined));
+      apply(decideInteriorAccess(null, undefined));
+      return;
+    }
+    const early = decideInteriorAccess(user, undefined);
+    if (early !== null) {
+      apply(early); // 未驗證 Email：不必等使用者資料
       return;
     }
     // 持續訂閱：使用中被停用也會立刻換成停用提示。
     unsubscribeProfile = subscribeUserProfile(
       user.uid,
-      (profile) => apply(decideInteriorAccess(true, profile)),
+      (profile) => apply(decideInteriorAccess(user, profile)),
       () => apply('no-profile'),
     );
   });

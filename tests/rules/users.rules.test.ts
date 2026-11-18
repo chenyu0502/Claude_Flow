@@ -374,6 +374,32 @@ describe('portfolios（台股分析）', () => {
     await assertFails(getDoc(doc(db, 'portfolios', 'alice')));
     await assertFails(setDoc(doc(db, 'portfolios', 'alice'), { cash: 1 }));
   });
+
+  describe('Email 驗證', () => {
+    const dbWith = (token: Record<string, unknown>) =>
+      testEnv.authenticatedContext('alice', token).firestore();
+    const passwordOnly = { firebase: { sign_in_provider: 'password', identities: { email: ['a@x.tw'] } } };
+
+    it('只用 Email/密碼且未驗證信箱 → 不能讀寫', async () => {
+      const db = dbWith({ ...passwordOnly, email_verified: false });
+      await assertFails(getDoc(doc(db, 'portfolios', 'alice')));
+      await assertFails(setDoc(doc(db, 'portfolios', 'alice'), { cash: 1 }));
+    });
+
+    it('Email/密碼已驗證 → 可以讀寫', async () => {
+      const db = dbWith({ ...passwordOnly, email_verified: true });
+      await assertSucceeds(setDoc(doc(db, 'portfolios', 'alice'), { cash: 1 }));
+      await assertSucceeds(getDoc(doc(db, 'portfolios', 'alice')));
+    });
+
+    it('同時綁定 GitHub 的帳號 email_verified 為 false 仍可讀寫', async () => {
+      const db = dbWith({
+        email_verified: false,
+        firebase: { sign_in_provider: 'password', identities: { email: ['a@x.tw'], 'github.com': ['1'] } },
+      });
+      await assertSucceeds(getDoc(doc(db, 'portfolios', 'alice')));
+    });
+  });
 });
 
 describe('handan（台股損益存摺，手機端唯讀）', () => {

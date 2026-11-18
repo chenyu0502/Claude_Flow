@@ -9,6 +9,16 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // 只用 Email/密碼登入、還沒驗證信箱的帳號回傳 false，其他一律 true。
+    // 與前端 needsEmailVerification、API 的 isUnverifiedPasswordAccount 同一套判斷：
+    // identities 裡只有 email（Email/密碼）才需要驗證；GitHub 帳號的 email_verified 常是 false，不能擋。
+    function emailVerifiedIfPassword() {
+      let ids = request.auth.token.get('firebase', {}).get('identities', {});
+      return request.auth.token.get('email_verified', false) == true
+        || !('email' in ids)
+        || ids.size() > 1;
+    }
+
     function userPath(uid) {
       return /databases/$(database)/documents/users/$(uid);
     }
@@ -99,9 +109,10 @@ service cloud.firestore {
     }
 
     // 台股分析的投資組合（沿用原台股分析專案的規則）：只能存取自己的文件。
+    // Email/密碼註冊的帳號要先驗證信箱才能讀寫。
     // 台股分析開放給所有登入的使用者；資料層面每個人只碰得到自己的持股（管理員也不例外）。
     match /portfolios/{userId} {
-      allow read, write: if signedIn() && request.auth.uid == userId;
+      allow read, write: if signedIn() && request.auth.uid == userId && emailVerifiedIfPassword();
     }
 
     // 台股損益存摺（HanDan）：手機端唯讀。

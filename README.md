@@ -3,7 +3,8 @@
 帶使用者管理與 OAuth 認證的全端應用：React 18 + Vite + TypeScript + Firebase（Auth + Firestore），部署於 Vercel。
 
 - 登入方式：Google、GitHub、Email/密碼；同一 email 用不同方式登入時自動綁定
-- 個人資料：編輯顯示名稱與頭像、綁定/解除登入方式
+- 個人資料：編輯顯示名稱與頭像、綁定/解除登入方式；有設定密碼的帳號可修改密碼（需先輸入目前的密碼）
+- **Email 驗證**：只用 Email/密碼註冊的帳號要先點驗證信連結，才能使用各項功能。主站守衛、`/stock/`、`/interior/`、`/api/*` 與 Firestore 規則（`portfolios`）都會檢查，判斷邏輯一致（`src/auth/emailVerification.ts`）。Google、GitHub 登入不受影響
 - 管理員後台（`/admin/users`）：搜尋、篩選、調整角色、停用帳號
 - **台股分析（`/stock/`，所有登入的使用者）**：持股、績效、個股分析與 AI 解讀，由原「台股分析」專案併入；每個人的持股彼此看不到，AI 解讀需填自己的 Gemini API Key
 - 權限由 Firestore Security Rules 把關（見 `firestore.rules`，規格見 `CONTRACTS.md`）

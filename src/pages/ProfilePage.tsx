@@ -1,11 +1,12 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import type { Timestamp } from 'firebase/firestore';
-import { KeyRound, Mail, PenLine } from 'lucide-react';
+import { KeyRound, LockKeyhole, Mail, PenLine } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { Avatar } from '../components/NavBar';
 import { GithubIcon, GoogleIcon } from '../components/OAuthButtons';
 import { auth } from '../lib/firebase';
-import { authErrorMessage, isUserCancelled, linkProvider, unlinkProvider } from '../services/auth';
+import { authErrorMessage, changePassword, isUserCancelled, linkProvider, unlinkProvider } from '../services/auth';
+import { PASSWORD_MIN } from './RegisterPage';
 import { ensureUserProfile, updateOwnProfile } from '../services/users';
 import { PROVIDER_LABELS, SUPPORTED_PROVIDERS, type ProviderId } from '../types/user';
 import './profile.css';
@@ -38,6 +39,103 @@ export function validateProfile(displayName: string, photoURL: string): string |
 }
 
 type Msg = { kind: 'success' | 'error'; text: string } | null;
+
+/** 修改密碼表單的檢查；透過時返回 null */
+export function validatePasswordChange(current: string, next: string, confirm: string): string | null {
+  if (!current) return '請輸入目前的密碼';
+  if (!next) return '請輸入新密碼';
+  if (next.length < PASSWORD_MIN) return `新密碼至少需要 ${PASSWORD_MIN} 個字元`;
+  if (next === current) return '新密碼不能與目前的密碼相同';
+  if (confirm !== next) return '兩次輸入的新密碼不一致';
+  return null;
+}
+
+/** 修改密碼（只有綁定了 Email/密碼的帳號才會顯示） */
+function ChangePasswordSection() {
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<Msg>(null);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setMsg(null);
+    const err = validatePasswordChange(current, next, confirm);
+    if (err) {
+      setMsg({ kind: 'error', text: err });
+      return;
+    }
+    setBusy(true);
+    try {
+      await changePassword(current, next);
+      setCurrent('');
+      setNext('');
+      setConfirm('');
+      setMsg({ kind: 'success', text: '密碼已更新' });
+    } catch (changeErr) {
+      setMsg({ kind: 'error', text: authErrorMessage(changeErr) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="card">
+      <div className="section-title">
+        <span className="icon-tile gold">
+          <LockKeyhole size={20} aria-hidden="true" />
+        </span>
+        <div>
+          <h2>修改密碼</h2>
+          <p className="muted">為了安全，需要先輸入目前的密碼。新密碼至少 {PASSWORD_MIN} 個字元。</p>
+        </div>
+      </div>
+      <form className="stack" onSubmit={handleSubmit} noValidate>
+        <div className="field">
+          <label htmlFor="currentPassword">目前的密碼</label>
+          <input
+            id="currentPassword"
+            type="password"
+            autoComplete="current-password"
+            value={current}
+            onChange={(e) => setCurrent(e.target.value)}
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="newPassword">新密碼</label>
+          <input
+            id="newPassword"
+            type="password"
+            autoComplete="new-password"
+            value={next}
+            onChange={(e) => setNext(e.target.value)}
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="confirmPassword">再次輸入新密碼</label>
+          <input
+            id="confirmPassword"
+            type="password"
+            autoComplete="new-password"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+          />
+        </div>
+        {msg && (
+          <div className={`alert alert-${msg.kind}`} role={msg.kind === 'error' ? 'alert' : 'status'}>
+            {msg.text}
+          </div>
+        )}
+        <div className="row">
+          <button type="submit" className="btn btn-primary" disabled={busy}>
+            {busy ? '更新中…' : '更新密碼'}
+          </button>
+        </div>
+      </form>
+    </section>
+  );
+}
 
 function linkedProviders(providerData: { providerId: string }[] | undefined): ProviderId[] {
   const ids = (providerData ?? []).map((p) => p.providerId);
@@ -249,6 +347,8 @@ export default function ProfilePage() {
           </div>
         )}
       </section>
+
+      {linked.includes('password') && <ChangePasswordSection />}
       </div>
     </div>
   );

@@ -4,6 +4,7 @@ import { Provider } from 'react-redux';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { subscribeUserProfile } from '../services/users';
+import { needsEmailVerification } from '../auth/emailVerification';
 import { store } from './store/index.js';
 import { setUser } from './store/authSlice.js';
 import { hydrate } from './store/portfolioSlice.js';
@@ -35,7 +36,7 @@ import './index.css';
  * 雲端，兩者同時進行會讓合併在兩條路徑上交錯，難以推理。
  */
 
-/** @typedef {'checking' | 'signed-out' | 'denied' | 'disabled' | 'granted'} Access */
+/** @typedef {'checking' | 'signed-out' | 'unverified' | 'denied' | 'disabled' | 'granted'} Access */
 
 let unsubscribeCloud = null;
 let unsubscribeProfile = null;
@@ -106,6 +107,13 @@ onAuthStateChanged(auth, (user) => {
     return;
   }
 
+  // Email/密碼註冊但還沒驗證信箱：不啟動同步（Firestore 規則也會拒絕讀寫 portfolios）。
+  if (needsEmailVerification(user)) {
+    stopSync();
+    setAccess('unverified');
+    return;
+  }
+
   setAccess('checking');
   unsubscribeProfile = subscribeUserProfile(
     user.uid,
@@ -168,6 +176,9 @@ function Gate() {
   }
   if (current === 'disabled') {
     return <Notice title="帳號已停用">你的帳號已被停用，請聯絡管理員。</Notice>;
+  }
+  if (current === 'unverified') {
+    return <Notice title="請先驗證 Email">請到信箱點驗證信中的連結，完成後回 Claude Flow 首頁再開啟台股分析。</Notice>;
   }
   if (current === 'denied') {
     return <Notice title="請先登入 Claude Flow">請從 Claude Flow 首頁登入後，再開啟台股分析。</Notice>;

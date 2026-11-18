@@ -5,6 +5,12 @@ const mocks = vi.hoisted(() => ({
   signInWithPopup: vi.fn(),
   unlink: vi.fn(),
   linkWithPopup: vi.fn(),
+  createUserWithEmailAndPassword: vi.fn(),
+  updateProfile: vi.fn(),
+  sendEmailVerification: vi.fn(),
+  reauthenticateWithCredential: vi.fn(),
+  updatePassword: vi.fn(),
+  emailCredential: vi.fn((email: string, password: string) => ({ email, password })),
   googleCredentialFromError: vi.fn(),
   githubCredentialFromError: vi.fn(),
 }));
@@ -36,13 +42,22 @@ vi.mock('firebase/auth', async (importOriginal) => {
     signInWithPopup: mocks.signInWithPopup,
     unlink: mocks.unlink,
     linkWithPopup: mocks.linkWithPopup,
+    createUserWithEmailAndPassword: mocks.createUserWithEmailAndPassword,
+    updateProfile: mocks.updateProfile,
+    sendEmailVerification: mocks.sendEmailVerification,
+    reauthenticateWithCredential: mocks.reauthenticateWithCredential,
+    updatePassword: mocks.updatePassword,
+    EmailAuthProvider: { credential: mocks.emailCredential },
   };
 });
 
 import {
   AccountExistsWithDifferentCredentialError,
   authErrorMessage,
+  changePassword,
   isUserCancelled,
+  sendVerificationEmail,
+  signUpWithEmail,
   linkProvider,
   signInWithGithub,
   signInWithGoogle,
@@ -178,5 +193,65 @@ describe('linkProvider / unlinkProvider', () => {
     mocks.unlink.mockResolvedValue(user);
     await expect(unlinkProvider('github.com')).resolves.toBe(user);
     expect(mocks.unlink).toHaveBeenCalledWith(user, 'github.com');
+  });
+});
+
+describe('Email 驗證信', () => {
+  it('註冊後寄出驗證信，連結帶回目前網域的首頁', async () => {
+    const user = { uid: 'n1', reload: vi.fn().mockResolvedValue(undefined) };
+    mocks.createUserWithEmailAndPassword.mockResolvedValue({ user });
+    mocks.updateProfile.mockResolvedValue(undefined);
+    mocks.sendEmailVerification.mockResolvedValue(undefined);
+    await signUpWithEmail('n@x.tw', 'secret1', 'N');
+    expect(mocks.sendEmailVerification).toHaveBeenCalledWith(user, { url: `${window.location.origin}/` });
+  });
+
+  it('驗證信寄送失敗不影響註冊', async () => {
+    const user = { uid: 'n1', reload: vi.fn().mockResolvedValue(undefined) };
+    mocks.createUserWithEmailAndPassword.mockResolvedValue({ user });
+    mocks.updateProfile.mockResolvedValue(undefined);
+    mocks.sendEmailVerification.mockRejectedValue(fbErr('auth/too-many-requests'));
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await expect(signUpWithEmail('n@x.tw', 'secret1', 'N')).resolves.toBe(user);
+    spy.mockRestore();
+  });
+
+  it('未登入時不能寄送', async () => {
+    await expect(sendVerificationEmail()).rejects.toThrow('請先登入');
+    expect(mocks.sendEmailVerification).not.toHaveBeenCalled();
+  });
+});
+
+describe('changePassword', () => {
+  const passwordUser = { email: 'a@x.tw', providerData: [{ providerId: 'password' }] };
+
+  it('先用目前的密碼重新驗證，再更新密碼', async () => {
+    mocks.auth.currentUser = passwordUser;
+    mocks.reauthenticateWithCredential.mockResolvedValue(undefined);
+    mocks.updatePassword.mockResolvedValue(undefined);
+    await changePassword('old123', 'new123');
+    expect(mocks.emailCredential).toHaveBeenCalledWith('a@x.tw', 'old123');
+    expect(mocks.reauthenticateWithCredential).toHaveBeenCalledWith(passwordUser, {
+      email: 'a@x.tw',
+      password: 'old123',
+    });
+    expect(mocks.updatePassword).toHaveBeenCalledWith(passwordUser, 'new123');
+  });
+
+  it('目前的密碼錯誤 → 「目前的密碼不正確」，不更新密碼', async () => {
+    mocks.auth.currentUser = passwordUser;
+    mocks.reauthenticateWithCredential.mockRejectedValue(fbErr('auth/invalid-credential'));
+    await expect(changePassword('bad', 'new123')).rejects.toThrow('目前的密碼不正確');
+    expect(mocks.updatePassword).not.toHaveBeenCalled();
+  });
+
+  it('沒有綁定 Email/密碼的帳號 → 拒絕', async () => {
+    mocks.auth.currentUser = { email: 'a@x.tw', providerData: [{ providerId: 'google.com' }] };
+    await expect(changePassword('x', 'new123')).rejects.toThrow('沒有設定密碼');
+    expect(mocks.reauthenticateWithCredential).not.toHaveBeenCalled();
+  });
+
+  it('未登入 → 拒絕', async () => {
+    await expect(changePassword('x', 'new123')).rejects.toThrow('請先登入');
   });
 });

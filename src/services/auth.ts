@@ -1,15 +1,19 @@
 // OWNER: Agent A。只負責 Firebase Auth 操作，不碰 Firestore（使用者文件由 AuthContext 調 users.ts 處理）。
 import {
+  EmailAuthProvider,
   GithubAuthProvider,
   GoogleAuthProvider,
   createUserWithEmailAndPassword,
   linkWithCredential,
   linkWithPopup,
+  reauthenticateWithCredential,
+  sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
   unlink,
+  updatePassword,
   updateProfile,
 } from 'firebase/auth';
 import type { AuthCredential, AuthProvider, User } from 'firebase/auth';
@@ -88,12 +92,52 @@ export async function signInWithEmail(email: string, password: string): Promise<
   const result = await signInWithEmailAndPassword(auth, email, password);
   return result.user;
 }
-/** 註冊後同時設定 Auth 的 displayName */
+/** 註冊後同時設定 Auth 的 displayName，並寄出 Email 驗證信 */
 export async function signUpWithEmail(email: string, password: string, displayName: string): Promise<User> {
   const result = await createUserWithEmailAndPassword(auth, email, password);
   await updateProfile(result.user, { displayName });
+  // 驗證信寄送失敗不能讓註冊失敗：帳號已經建好了，驗證提示頁可以再寄一次。
+  try {
+    await sendVerificationEmail(result.user);
+  } catch (err) {
+    console.error('[auth] 寄送驗證信失敗', err);
+  }
   await result.user.reload();
   return auth.currentUser ?? result.user;
+}
+
+/**
+ * 寄出 Email 驗證信。信中連結驗證完會帶使用者回到 Claude Flow 首頁。
+ * continueUrl 的網域必須在 Firebase 的授權網域中，否則 Firebase 會拒絕寄送。
+ */
+export async function sendVerificationEmail(user: User | null = auth.currentUser): Promise<void> {
+  if (!user) throw new Error('請先登入');
+  const url = typeof window === 'undefined' ? undefined : `${window.location.origin}/`;
+  await sendEmailVerification(user, url ? { url } : undefined);
+}
+
+/**
+ * 修改密碼。Firebase 要求「最近登入過」才能改密碼，所以先用目前的密碼重新驗證一次，
+ * 這也順便確認操作的人知道原本的密碼（避免別人拿到開著的瀏覽器就能改掉密碼）。
+ */
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  const user = auth.currentUser;
+  if (!user) throw new Error('請先登入');
+  if (!user.email || !user.providerData.some((p) => p.providerId === 'password')) {
+    throw new Error('此帳號沒有設定密碼，請用原本的登入方式登入');
+  }
+  const credential = EmailAuthProvider.credential(user.email, currentPassword);
+  try {
+    await reauthenticateWithCredential(user, credential);
+  } catch (err) {
+    // 重新驗證時密碼錯，Firebase 回的是登入用的錯誤碼；在這裡改成「目前的密碼不正確」比較好懂。
+    const code = getAuthErrorCode(err);
+    if (code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
+      throw new Error('目前的密碼不正確');
+    }
+    throw err;
+  }
+  await updatePassword(user, newPassword);
 }
 export async function sendResetEmail(email: string): Promise<void> {
   await sendPasswordResetEmail(auth, email);
@@ -141,11 +185,13 @@ const ERROR_MESSAGES: Record<string, string> = {
   'auth/provider-already-linked': '已綁定過此登入方式',
   'auth/requires-recent-login': '為了安全，請重新登入後再執行此操作',
   'auth/operation-not-allowed': '此登入方式尚未啟用，請在 Firebase Console 的 Authentication 中啟用',
+  'auth/unauthorized-continue-uri': '目前的網域不在 Firebase 授權網域清單中，無法寄送驗證信',
+  'auth/missing-password': '請輸入密碼',
 };
 
 const DEFAULT_ERROR_MESSAGE = '發生未知錯誤，請稍後再試';
 
-/** 把任何錯誤轉成給使用者看的簡體中文訊息 */
+/** 把任何錯誤轉成給使用者看的繁體中文訊息 */
 export function authErrorMessage(err: unknown): string {
   if (err instanceof AccountExistsWithDifferentCredentialError) {
     return '此 email 已用其他方式註冊，請先用原本的方式登入，完成後會自動綁定';

@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import type { AuthContextValue } from '../auth/AuthContext';
-import ProfilePage, { validateProfile } from './ProfilePage';
+import ProfilePage, { validatePasswordChange, validateProfile } from './ProfilePage';
 
 const mockUseAuth = vi.fn<() => Partial<AuthContextValue>>();
 vi.mock('../auth/AuthContext', () => ({ useAuth: () => mockUseAuth() }));
@@ -16,6 +16,7 @@ vi.mock('../services/users', () => users);
 const authSvc = vi.hoisted(() => ({
   linkProvider: vi.fn(),
   unlinkProvider: vi.fn(),
+  changePassword: vi.fn(),
   authErrorMessage: vi.fn(() => '操作失敗'),
   isUserCancelled: vi.fn(() => false),
 }));
@@ -162,5 +163,53 @@ describe('ProfilePage', () => {
     expect(authSvc.linkProvider).toHaveBeenCalledWith('google.com');
     await waitFor(() => expect(screen.getAllByRole('button', { name: '綁定' })[0]).toBeEnabled());
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+});
+
+describe('validatePasswordChange', () => {
+  it('檢查規則', () => {
+    expect(validatePasswordChange('', 'newpass', 'newpass')).toMatch('目前的密碼');
+    expect(validatePasswordChange('old123', '', '')).toMatch('請輸入新密碼');
+    expect(validatePasswordChange('old123', '12345', '12345')).toMatch('至少需要 6');
+    expect(validatePasswordChange('old123', 'old123', 'old123')).toMatch('不能與目前的密碼相同');
+    expect(validatePasswordChange('old123', 'new123', 'new124')).toMatch('不一致');
+    expect(validatePasswordChange('old123', 'new123', 'new123')).toBeNull();
+  });
+});
+
+describe('修改密碼', () => {
+  async function fillAndSubmit(current: string, next: string, confirm: string) {
+    await userEvent.type(screen.getByLabelText('目前的密碼'), current);
+    await userEvent.type(screen.getByLabelText('新密碼'), next);
+    await userEvent.type(screen.getByLabelText('再次輸入新密碼'), confirm);
+    await userEvent.click(screen.getByRole('button', { name: '更新密碼' }));
+  }
+
+  it('沒有綁定 Email/密碼的帳號不顯示', () => {
+    setup(['google.com']);
+    expect(screen.queryByRole('heading', { name: '修改密碼' })).not.toBeInTheDocument();
+  });
+
+  it('成功後清空表單並顯示已更新', async () => {
+    authSvc.changePassword.mockResolvedValue(undefined);
+    setup(['password']);
+    await fillAndSubmit('old123', 'new123', 'new123');
+    expect(authSvc.changePassword).toHaveBeenCalledWith('old123', 'new123');
+    expect(await screen.findByText('密碼已更新')).toBeInTheDocument();
+    expect(screen.getByLabelText('目前的密碼')).toHaveValue('');
+  });
+
+  it('表單檢查不通過時不呼叫 changePassword', async () => {
+    setup(['password']);
+    await fillAndSubmit('old123', 'new123', 'oops');
+    expect(await screen.findByRole('alert')).toHaveTextContent('不一致');
+    expect(authSvc.changePassword).not.toHaveBeenCalled();
+  });
+
+  it('失敗時顯示錯誤訊息', async () => {
+    authSvc.changePassword.mockRejectedValue(new Error('目前的密碼不正確'));
+    setup(['password']);
+    await fillAndSubmit('wrong1', 'new123', 'new123');
+    expect(await screen.findByRole('alert')).toHaveTextContent('操作失敗');
   });
 });

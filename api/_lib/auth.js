@@ -51,7 +51,25 @@ function decodePayload(token) {
 }
 
 /**
- * 確認請求來自登入且未停用的 Claude Flow 使用者。
+ * token 是否屬於「只用 Email/密碼登入、還沒驗證信箱」的帳號。
+ *
+ * 與前端的 needsEmailVerification（src/auth/emailVerification.ts）同一套判斷：
+ * firebase.identities 列出帳號綁定的所有登入方式，Email/密碼的鍵名是 "email"。
+ * 只有全部都是 email 且 email_verified 不是 true 才算未驗證；
+ * GitHub 帳號的 email_verified 常是 false，但信箱由 GitHub 驗證過，不能擋。
+ *
+ * @param {object} payload 解出的 token payload
+ */
+export function isUnverifiedPasswordAccount(payload) {
+  if (payload?.email_verified === true) return false;
+  const identities = payload?.firebase?.identities;
+  if (!identities || typeof identities !== 'object') return false;
+  const keys = Object.keys(identities);
+  return keys.length > 0 && keys.every((k) => k === 'email');
+}
+
+/**
+ * 確認請求來自登入、未停用、且（Email/密碼帳號）已驗證信箱的 Claude Flow 使用者。
  *
  * @param {string|undefined} authorization 請求的 Authorization 標頭
  * @param {Record<string, string|undefined>} env 環境變數
@@ -74,6 +92,9 @@ export async function verifyMember(authorization, env, fetchImpl = fetch) {
 
   const expiresAtMs = typeof payload.exp === 'number' ? payload.exp * 1000 : 0;
   if (expiresAtMs <= now) return fail(401, '登入已過期，請重新整理頁面');
+  // payload 在這裡還沒驗簽章，但偽造的 token 下面讀 Firestore 時一定會被拒絕；
+  // 這一關只會讓請求更嚴格，不會讓偽造的 token 通過，所以放在打 Firestore 之前省一次請求。
+  if (isUnverifiedPasswordAccount(payload)) return fail(403, '請先完成 Email 驗證');
 
   const projectId = env.FIREBASE_PROJECT_ID || env.VITE_FIREBASE_PROJECT_ID;
   if (!projectId) return fail(500, '伺服器未設定 Firebase 專案（VITE_FIREBASE_PROJECT_ID）');

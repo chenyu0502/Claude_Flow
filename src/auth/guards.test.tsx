@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import type { User } from 'firebase/auth';
 import type { AuthContextValue } from './AuthContext';
@@ -6,6 +6,7 @@ import { RequireAdmin, RequireAuth } from './guards';
 
 const mockUseAuth = vi.fn<() => AuthContextValue>();
 vi.mock('./AuthContext', () => ({ useAuth: () => mockUseAuth() }));
+vi.mock('../services/auth', () => ({ authErrorMessage: () => '操作失敗' }));
 
 function makeAuth(overrides: Partial<AuthContextValue> = {}): AuthContextValue {
   return {
@@ -14,12 +15,15 @@ function makeAuth(overrides: Partial<AuthContextValue> = {}): AuthContextValue {
     loading: false,
     isAdmin: false,
     isDisabled: false,
+    needsEmailVerification: false,
     pendingLinkEmail: null,
     signInWithGoogle: vi.fn(),
     signInWithGithub: vi.fn(),
     signInWithEmail: vi.fn(),
     signUpWithEmail: vi.fn(),
     resetPassword: vi.fn(),
+    resendVerificationEmail: vi.fn().mockResolvedValue(undefined),
+    refreshEmailVerification: vi.fn().mockResolvedValue(false),
     signOut: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
@@ -68,6 +72,46 @@ describe('RequireAuth', () => {
     expect(screen.queryByText('個人資料內容')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '登出' }));
     expect(auth.signOut).toHaveBeenCalledTimes(1);
+  });
+
+  it('Email 未驗證顯示驗證提示，不渲染 children', () => {
+    mockUseAuth.mockReturnValue(makeAuth({ needsEmailVerification: true, user: { uid: 'u1', email: 'a@x.tw' } as User }));
+    renderAt('/profile');
+    expect(screen.getByRole('heading', { name: '請驗證你的 Email' })).toBeInTheDocument();
+    expect(screen.getByText('a@x.tw')).toBeInTheDocument();
+    expect(screen.queryByText('個人資料內容')).not.toBeInTheDocument();
+  });
+
+  it('驗證提示：重新寄送成功顯示已寄出', async () => {
+    const auth = makeAuth({ needsEmailVerification: true });
+    mockUseAuth.mockReturnValue(auth);
+    renderAt('/profile');
+    fireEvent.click(screen.getByRole('button', { name: '重新寄送驗證信' }));
+    expect(await screen.findByText(/驗證信已寄出/)).toBeInTheDocument();
+    expect(auth.resendVerificationEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it('驗證提示：按「我已完成驗證」但還沒驗證時提示先點連結', async () => {
+    const auth = makeAuth({ needsEmailVerification: true });
+    mockUseAuth.mockReturnValue(auth);
+    renderAt('/profile');
+    fireEvent.click(screen.getByRole('button', { name: '我已完成驗證' }));
+    expect(await screen.findByText(/還沒有完成驗證/)).toBeInTheDocument();
+    expect(auth.refreshEmailVerification).toHaveBeenCalledTimes(1);
+  });
+
+  it('驗證提示：切回分頁時自動檢查驗證狀態', async () => {
+    const auth = makeAuth({ needsEmailVerification: true });
+    mockUseAuth.mockReturnValue(auth);
+    renderAt('/profile');
+    fireEvent.focus(window);
+    await waitFor(() => expect(auth.refreshEmailVerification).toHaveBeenCalledTimes(1));
+  });
+
+  it('已停用優先於 Email 未驗證', () => {
+    mockUseAuth.mockReturnValue(makeAuth({ isDisabled: true, needsEmailVerification: true }));
+    renderAt('/profile');
+    expect(screen.getByText('帳號已停用，請聯絡管理員')).toBeInTheDocument();
   });
 
   it('已登入正常渲染 children', () => {

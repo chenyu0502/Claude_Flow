@@ -144,6 +144,36 @@ describe('verifyMember', () => {
   });
 });
 
+describe('Email 驗證', () => {
+  const tokenWith = (extra) => makeToken({ user_id: 'alice', sub: 'alice', exp: future(), ...extra });
+
+  it('只用 Email/密碼且未驗證信箱 → 403，不打 Firestore', async () => {
+    const f = firestoreReturns(200, adminFields);
+    const token = tokenWith({ email_verified: false, firebase: { identities: { email: ['a@x.tw'] } } });
+    expect(await verifyMember(`Bearer ${token}`, ENV, f)).toEqual({
+      ok: false,
+      status: 403,
+      error: '請先完成 Email 驗證',
+    });
+    expect(f).not.toHaveBeenCalled();
+  });
+
+  it('Email/密碼已驗證 → 通過', async () => {
+    const f = firestoreReturns(200, adminFields);
+    const token = tokenWith({ email_verified: true, firebase: { identities: { email: ['a@x.tw'] } } });
+    expect(await verifyMember(`Bearer ${token}`, ENV, f)).toMatchObject({ ok: true });
+  });
+
+  it('GitHub 帳號 email_verified 為 false 仍通過（信箱由 GitHub 驗證）', async () => {
+    const f = firestoreReturns(200, adminFields);
+    const token = tokenWith({
+      email_verified: false,
+      firebase: { identities: { 'github.com': ['1'], email: ['a@x.tw'] } },
+    });
+    expect(await verifyMember(`Bearer ${token}`, ENV, f)).toMatchObject({ ok: true });
+  });
+});
+
 describe('readGeminiKey', () => {
   const key = 'AIzaSyA1234567890abcdefghij_-XYZ';
 
