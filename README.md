@@ -58,7 +58,7 @@ npm run typecheck
 1. **發布規則**：`firestore.rules` 已包含 `myfirebase-22090` 上全部三段規則（`users`、`portfolios`，以及台股損益存摺 HanDan 手機端用的 `handan`，2026-11-12 從 Console 併入）。把整份貼到 Console → Firestore → 規則 發布，或執行 `npx firebase deploy --only firestore:rules --project myfirebase-22090`。之後改規則一律改這個檔案，不要只在 Console 上改，否則下次部署會被覆蓋。
 2. **Authentication → Sign-in method**：Google 已啟用；要用 Email/密碼或 GitHub 再另外啟用（GitHub 需先到 GitHub → Settings → Developer settings → OAuth Apps 新建，Callback URL 填 `https://myfirebase-22090.firebaseapp.com/__/auth/handler`）。
 3. **Authentication → Settings → Authorized domains**：加入 Claude Flow 的 Vercel 網域。
-4. **Vercel**：匯入 GitHub repo，框架選 Vite，環境變數必填 `VITE_FIREBASE_*`（`VITE_USE_EMULATOR=false`），選填 `FINMIND_TOKEN`（基本面、法人歷史、產業分類）與 `GEMINI_API_KEY`（只供管理員沒填自己的金鑰時備用）、`GEMINI_MODEL`。`vercel.json` 已設定好 `/stock/` 與 SPA 的轉址規則、API 路徑排除。
+4. **Vercel**：匯入 GitHub repo，框架選 Vite，環境變數必填 `VITE_FIREBASE_*`（`VITE_USE_EMULATOR=false`），選填 `FINMIND_TOKEN`（基本面、法人歷史、產業分類）與 `GEMINI_API_KEY`（只供管理員沒填自己的金鑰時備用）、`GEMINI_MODEL`。`vercel.json` 已設定好 `/stock/` 與 SPA 的轉址規則、API 路徑排除，以及 `/assets/` 的長期快取（檔名帶內容雜湊，改版就換檔名；唯一不帶雜湊的 `interior-gate.js` 排除在外，以免使用者一直拿到舊版登入檢查）。
 5. **第一個管理員**：用 Google 帳號登入 Claude Flow 一次，到 Firestore 控制台把 `users/{你的 uid}` 的 `role` 改為 `admin`。
 
 原台股分析網站（tw-stock-analysis.vercel.app）與這裡讀寫同一份 `portfolios` 資料，可以並行使用，確認新版沒問題再停用。
