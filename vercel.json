@@ -13,8 +13,9 @@
     { "source": "/interior", "destination": "/interior/", "permanent": false }
   ],
   "rewrites": [
-    { "source": "/stock", "destination": "https://tw-stock-analysis.vercel.app/stock/" },
-    { "source": "/stock/:path*", "destination": "https://tw-stock-analysis.vercel.app/stock/:path*" },
+    { "source": "/stock", "destination": "https://tw-stock-analysis.vercel.app/stock/index.html" },
+    { "source": "/stock/", "destination": "https://tw-stock-analysis.vercel.app/stock/index.html" },
+    { "source": "/stock/:path+", "destination": "https://tw-stock-analysis.vercel.app/stock/:path+" },
     { "source": "/api/:path*", "destination": "https://tw-stock-analysis.vercel.app/api/:path*" },
     { "source": "/interior/", "destination": "/interior/index.html" },
     {
