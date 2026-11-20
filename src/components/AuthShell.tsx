@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { ShieldCheck, Sofa, TrendingUp } from 'lucide-react';
+import { Plane, ShieldCheck, Sofa, TrendingUp } from 'lucide-react';
 import BrandMark from './BrandMark';
 
 /**
@@ -19,6 +19,10 @@ export default function AuthShell({ children }: { children: ReactNode }) {
             <li>
               <Sofa size={18} />
               室內設計：2D 平面圖即時生成 3D
+            </li>
+            <li>
+              <Plane size={18} />
+              旅遊規劃：每日動線、預算與行前清單
             </li>
             <li>
               <TrendingUp size={18} />

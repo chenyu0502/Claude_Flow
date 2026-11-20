@@ -6,7 +6,8 @@
  *   不能因此擋住 GitHub 使用者，所以只看「是否全部都是 password」。
  * - 綁定了 Google 的 Email/密碼帳號，Firebase 會把 emailVerified 改成 true。
  *
- * 主站守衛、台股、室內設計共用這個判斷，三個入口的行為才會一致。
+ * 主站守衛與各子網站（室內設計、旅遊規劃）共用這個判斷，各入口的行為才會一致；
+ * 台股在自己的 repo 有一份副本（tw-stock-analysis 的 src/claudeFlow/emailVerification.js），改的時候要一起改。
  */
 export function needsEmailVerification(
   user: { emailVerified?: boolean; providerData?: { providerId: string }[] } | null | undefined,
