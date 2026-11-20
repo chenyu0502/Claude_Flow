@@ -7,4 +7,4 @@
 import { isPublicShareView } from './interior-access';
 import { startSubsiteGate } from './subsite-gate';
 
-startSubsiteGate('室內設計', () => isPublicShareView(window.location));
+startSubsiteGate('室內設計', { isPublic: () => isPublicShareView(window.location) });

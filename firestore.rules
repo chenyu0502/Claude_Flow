@@ -1,7 +1,7 @@
 rules_version = '2';
 
 // Firestore Security Rules（規格見 CONTRACTS.md「Security Rules 規格」）
-// 只開放 users/{uid}、portfolios/{uid}、auditLogs/{logId} 與 handan/{docId}，其他集合一律拒絕。
+// 只開放 users/{uid}、portfolios/{uid}、auditLogs/{logId}、trips/{tripId} 與 handan/{docId}，其他集合一律拒絕。
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -178,6 +178,47 @@ service cloud.firestore {
     // 台股分析開放給所有登入的使用者；資料層面每個人只碰得到自己的持股（管理員也不例外）。
     match /portfolios/{userId} {
       allow read, write: if signedIn() && request.auth.uid == userId && emailVerifiedIfPassword();
+    }
+
+    // ---- 旅遊規劃的行程 trips/{tripId} ----
+    // 分享方式是「知道連結就能看」：文件 ID 是 Firestore 自動產生的隨機字串，
+    // 登入且未停用的 Claude Flow 使用者可以用 ID 讀單一份行程（get），
+    // 但只能列出自己的行程（list 必須以 ownerUid == 自己 查詢），無法瀏覽別人的行程清單。
+    // 只有建立者可以修改與刪除。行程內容以 JSON 字串存在 json 欄位。
+
+    function activeUser() {
+      return signedIn()
+        && emailVerifiedIfPassword()
+        && exists(userPath(request.auth.uid))
+        && get(userPath(request.auth.uid)).data.get('disabled', true) == false;
+    }
+
+    function tripKeys() {
+      return ['ownerUid', 'ownerName', 'title', 'json', 'createdAt', 'updatedAt'];
+    }
+
+    // 約 30 萬字元；中文 UTF-8 每字 3 bytes，仍在 Firestore 單一文件 1 MiB 上限內
+    function validTrip(d) {
+      return d.keys().hasOnly(tripKeys())
+        && d.keys().hasAll(tripKeys())
+        && d.ownerUid == request.auth.uid
+        && (d.ownerName == null || (d.ownerName is string && d.ownerName.size() <= 50))
+        && d.title is string && d.title.size() > 0 && d.title.size() <= 100
+        && d.json is string && d.json.size() > 0 && d.json.size() <= 300000
+        && d.updatedAt == request.time;
+    }
+
+    match /trips/{tripId} {
+      allow get: if activeUser();
+      allow list: if activeUser() && resource.data.ownerUid == request.auth.uid;
+      allow create: if activeUser()
+        && validTrip(request.resource.data)
+        && request.resource.data.createdAt == request.time;
+      allow update: if activeUser()
+        && resource.data.ownerUid == request.auth.uid
+        && validTrip(request.resource.data)
+        && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if activeUser() && resource.data.ownerUid == request.auth.uid;
     }
 
     // 台股損益存摺（HanDan）：手機端唯讀。

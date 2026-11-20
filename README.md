@@ -27,6 +27,7 @@
 - **靜態子網站的共用流程**：下載與插入登入檢查在 `scripts/fetch-subsite.mjs`，登入檢查在 `src/subsite-gate.ts`；各子網站只有一個設定檔（`scripts/fetch-<名稱>.mjs`）與一個入口（`src/<名稱>-gate.ts`）。要新增靜態子網站，照旅遊規劃的做法加這兩個檔案，再補 `vite.config.ts` 的 `STATIC_SUBSITES`、`vercel.json` 的轉址、`package.json` 的 `predev` 與 `build`、`.gitignore`。
 - **Firestore 規則只有一份**，在本 repo 的 `firestore.rules`，包含台股的 `portfolios`。台股 repo 不放規則。
 - 台股的架構細節（持股隔離、API 登入驗證、Gemini 金鑰）見台股 repo 的 README。
+- **旅遊規劃的行程（Firestore `trips/{tripId}`）**：旅遊規劃本身不載入 Firebase。`src/travel-gate.ts` 通過登入檢查後，把 `src/travel-store.ts` 的存取介面以 `window.ClaudeFlowTravel` 提供給它。分享方式是「知道連結就能看」：登入且未停用的使用者可以用 ID 讀單一份行程，但只能列出自己的行程；只有建立者能修改與刪除（規則與測試：`firestore.rules`、`tests/rules/trips.rules.test.ts`）。
 
 ## 本地開發（Emulator，不需要真的 Firebase 專案）
 
@@ -55,7 +56,7 @@ npm run typecheck
 
 沿用原台股分析的 Firebase 專案，你用同一個 Google 帳號登入就會看到原本的持股。
 
-1. **發布規則與索引**：規則見下；個人資料頁的「帳號活動」需要 `auditLogs`（`actorUid` + `createdAt`）的複合索引，定義在 `firestore.indexes.json`，用 `npx firebase deploy --only firestore --project myfirebase-22090` 會一起建立。**規則**：`firestore.rules` 已包含 `myfirebase-22090` 上全部三段規則（`users`、`portfolios`，以及台股損益存摺 HanDan 手機端用的 `handan`，2026-11-12 從 Console 併入）。把整份貼到 Console → Firestore → 規則 發布，或執行 `npx firebase deploy --only firestore:rules --project myfirebase-22090`。之後改規則一律改這個檔案，不要只在 Console 上改，否則下次部署會被覆蓋。
+1. **發布規則與索引**：規則見下；個人資料頁的「帳號活動」需要 `auditLogs`（`actorUid` + `createdAt`）的複合索引，定義在 `firestore.indexes.json`，用 `npx firebase deploy --only firestore --project myfirebase-22090` 會一起建立。**規則**：`firestore.rules` 已包含 `myfirebase-22090` 上的全部規則（`users`、`auditLogs`、`portfolios`、旅遊規劃的 `trips`，以及台股損益存摺 HanDan 手機端用的 `handan`，2026-11-12 從 Console 併入）。把整份貼到 Console → Firestore → 規則 發布，或執行 `npx firebase deploy --only firestore:rules --project myfirebase-22090`。之後改規則一律改這個檔案，不要只在 Console 上改，否則下次部署會被覆蓋。
 2. **Authentication → Sign-in method**：Google 已啟用；要用 Email/密碼或 GitHub 再另外啟用（GitHub 需先到 GitHub → Settings → Developer settings → OAuth Apps 新建，Callback URL 填 `https://myfirebase-22090.firebaseapp.com/__/auth/handler`）。
 3. **Authentication → Settings → Authorized domains**：加入 Claude Flow 的 Vercel 網域。
 4. **Vercel**：匯入 GitHub repo，框架選 Vite，環境變數填 `VITE_FIREBASE_*`（`VITE_USE_EMULATOR=false`）。`FINMIND_TOKEN`、`GEMINI_API_KEY` 屬於台股，設在台股的 Vercel 專案。`vercel.json` 已設定好 SPA 轉址、`/stock/` 與 `/api/` 轉送到台股專案，以及 `/assets/` 的長期快取（檔名帶內容雜湊，改版就換檔名；唯一不帶雜湊的 `interior-gate.js` 排除在外，以免使用者一直拿到舊版登入檢查）。

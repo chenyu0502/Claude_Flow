@@ -4,10 +4,11 @@
  * 由 scripts/fetch-*.mjs 插進子網站的 index.html：頁面一開始被 <style id="cf-gate-style">
  * 隱藏，這裡確認是登入且未停用的 Claude Flow 使用者後才顯示。子網站本身的程式完全不知道這層檢查。
  */
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, type User } from 'firebase/auth';
 import type { Unsubscribe } from 'firebase/firestore';
 import { auth } from './lib/firebase';
 import { subscribeUserProfile } from './services/users';
+import type { UserProfile } from './types/user';
 import { decideSubsiteAccess, type SubsiteAccess } from './subsite-access';
 
 function reveal() {
@@ -38,16 +39,28 @@ function showNotice(appName: string, kind: Notice) {
   reveal();
 }
 
+export interface SubsiteGateOptions {
+  /** 回傳 true 時直接放行（例如室內設計的唯讀分享連結） */
+  isPublic?: () => boolean;
+  /** 第一次判定可以使用、顯示頁面之前呼叫一次（例如提供資料存取介面給子網站） */
+  onAllow?: (user: User, profile: UserProfile) => void;
+}
+
 /**
  * 啟動登入檢查。
  * @param appName 提示文字中的子網站名稱，例如「室內設計」
- * @param isPublic 回傳 true 時直接放行（例如室內設計的唯讀分享連結）
  */
-export function startSubsiteGate(appName: string, isPublic: () => boolean = () => false) {
-  const apply = (access: SubsiteAccess | null) => {
+export function startSubsiteGate(appName: string, { isPublic = () => false, onAllow }: SubsiteGateOptions = {}) {
+  let allowed = false;
+  const apply = (access: SubsiteAccess | null, user?: User, profile?: UserProfile | null) => {
     if (access === null) return; // 還在讀取，保持隱藏
-    if (access === 'allow') reveal();
-    else if (access === 'login') window.location.replace('/login');
+    if (access === 'allow') {
+      if (!allowed && user && profile) {
+        allowed = true;
+        onAllow?.(user, profile);
+      }
+      reveal();
+    } else if (access === 'login') window.location.replace('/login');
     else showNotice(appName, access);
   };
 
@@ -71,7 +84,7 @@ export function startSubsiteGate(appName: string, isPublic: () => boolean = () =
     // 持續訂閱：使用中被停用也會立刻換成停用提示。
     unsubscribeProfile = subscribeUserProfile(
       user.uid,
-      (profile) => apply(decideSubsiteAccess(user, profile)),
+      (profile) => apply(decideSubsiteAccess(user, profile), user, profile),
       () => apply('no-profile'),
     );
   });
