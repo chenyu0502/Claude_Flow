@@ -64,9 +64,9 @@ export default function HomePage() {
       <div className="container">
         <section className="home-hero">
           <span className="eyebrow">個人工作台</span>
-          <h1>把設計與投資，放在同一個地方</h1>
+          <h1>設計、旅行與投資，都在這裡</h1>
           <p className="home-hero-lead">
-            Claude Flow 集合了室內設計工作室與台股分析，一個帳號登入，所有工具隨手可用。
+            Claude Flow 集合了室內設計、旅遊規劃與台股分析，一個帳號登入，所有工具隨手可用。
           </p>
           <div className="row home-actions">
             <Link to="/register" className="btn btn-primary">
@@ -87,6 +87,13 @@ export default function HomePage() {
             <p className="muted">畫好 2D 平面圖即時生成 3D，拖拉家具門窗，選定風格讓 AI 幫你配置。</p>
           </div>
           <div className="card feature">
+            <span className="icon-tile sage">
+              <Plane size={22} aria-hidden="true" />
+            </span>
+            <h2>旅遊規劃</h2>
+            <p className="muted">輸入目的地與天數，排出每日動線、預算、行前清單與注意事項的旅遊手冊。</p>
+          </div>
+          <div className="card feature">
             <span className="icon-tile gold">
               <TrendingUp size={22} aria-hidden="true" />
             </span>
@@ -94,7 +101,7 @@ export default function HomePage() {
             <p className="muted">持股與績效追蹤、個股健康度與風險掃描，並以 AI 解讀價位結構。</p>
           </div>
           <div className="card feature">
-            <span className="icon-tile sage">
+            <span className="icon-tile">
               <ShieldCheck size={22} aria-hidden="true" />
             </span>
             <h2>安全登入</h2>
