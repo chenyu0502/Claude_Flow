@@ -1,5 +1,8 @@
 /// <reference types="vite/client" />
 
+/** 建置識別碼（vite-plugin-version.ts），與伺服器上的 /version.json 比對以偵測新版 */
+declare const __BUILD_ID__: string;
+
 interface ImportMetaEnv {
   readonly VITE_USE_EMULATOR?: string;
   readonly VITE_FIREBASE_API_KEY?: string;

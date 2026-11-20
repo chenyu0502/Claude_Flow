@@ -21,7 +21,7 @@
     { "source": "/interior/", "destination": "/interior/index.html" },
     { "source": "/travel/", "destination": "/travel/index.html" },
     {
-      "source": "/((?!api/|assets/|stock/|interior/|travel/).*)",
+      "source": "/((?!api/|assets/|stock/|interior/|travel/|version\\.json$).*)",
       "destination": "/index.html"
     }
   ]

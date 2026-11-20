@@ -310,3 +310,16 @@ table.table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
 :root[data-style='modern'] h1,
 :root[data-style='modern'] h2 { letter-spacing: -0.015em; }
 :root[data-style='modern'] .eyebrow { letter-spacing: 0.08em; }
+
+/* ---------- 新版本提示列（src/components/UpdateBanner.tsx） ---------- */
+.update-banner { background: var(--primary-soft); border-bottom: 1px solid var(--border); }
+.update-banner-inner {
+  max-width: 1120px; margin: 0 auto; padding: 8px 20px;
+  display: flex; align-items: center; gap: 10px;
+}
+.update-banner-text { flex: 1 1 auto; min-width: 0; font-size: 0.88rem; }
+.update-banner .btn-sm { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; white-space: nowrap; }
+@media (max-width: 640px) {
+  .update-banner-inner { padding: 8px 12px; gap: 6px; }
+  .update-banner-text { font-size: 0.8rem; }
+}

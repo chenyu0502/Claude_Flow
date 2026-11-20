@@ -3,6 +3,7 @@ import { loadEnv } from 'vite';
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import type { Plugin } from 'vite';
+import versionPlugin, { resolveBuildId } from './vite-plugin-version';
 
 /** 由 Claude Flow 一起發布的靜態子網站（public/<名稱>/），建置時由 scripts/fetch-*.mjs 抓取 */
 const STATIC_SUBSITES = ['interior', 'travel'];
@@ -46,8 +47,12 @@ export default defineConfig(({ mode }) => {
   // 本機開發時同樣轉送到台股的開發伺服器，兩邊同網域、共用登入狀態，和正式環境一致。
   const stockDevUrl = env.STOCK_DEV_URL || 'http://localhost:5174';
 
+  const buildId = resolveBuildId();
+
   return {
-    plugins: [react(), subsiteDevIndex()],
+    plugins: [react(), subsiteDevIndex(), versionPlugin(buildId)],
+    // 新版偵測：編譯進程式的版本識別碼，與伺服器上的 /version.json 比對（src/components/UpdateBanner.tsx）。
+    define: { __BUILD_ID__: JSON.stringify(buildId) },
     server: {
       port: 5173,
       proxy: {
