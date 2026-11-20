@@ -10,6 +10,8 @@ ui-debug.log
 
 # 室內設計：建置時由 scripts/fetch-interior.mjs 從它自己的 repo 抓最新版，不進這個 repo
 public/interior
+# 旅遊規劃師：同上，由 scripts/fetch-travel.mjs 從 chenyu0502/travel-planner 抓取
+public/travel
 
 .vercel
 .env*

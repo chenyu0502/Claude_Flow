@@ -4,25 +4,27 @@
 
 - 登入方式：Google、GitHub、Email/密碼；同一 email 用不同方式登入時自動綁定
 - 個人資料：編輯顯示名稱與頭像、綁定/解除登入方式；有設定密碼的帳號可修改密碼（需先輸入目前的密碼）
-- **Email 驗證**：只用 Email/密碼註冊的帳號要先點驗證信連結，才能使用各項功能。主站守衛、`/stock/`、`/interior/`、`/api/*` 與 Firestore 規則（`portfolios`）都會檢查，判斷邏輯一致（`src/auth/emailVerification.ts`）。Google、GitHub 登入不受影響
+- **Email 驗證**：只用 Email/密碼註冊的帳號要先點驗證信連結，才能使用各項功能。主站守衛、`/stock/`、`/interior/`、`/travel/`、`/api/*` 與 Firestore 規則（`portfolios`）都會檢查，判斷邏輯一致（`src/auth/emailVerification.ts`）。Google、GitHub 登入不受影響
 - 管理員後台（`/admin/users`）：搜尋、篩選、調整角色、停用帳號
 - **登入紀錄與操作日誌**（Firestore `auditLogs`）：登入、登出、註冊、改密碼、綁定／解除登入方式、修改個人資料、管理員調整角色與停用帳號。管理員在 `/admin/logs` 看全部；每個人在個人資料頁看自己最近 10 筆
-- **台股分析（`/stock/`）**、**室內設計（`/interior/`）**：所有登入的使用者都能用，各自在獨立的 repo 開發（見下方「子網站」）
+- **台股分析（`/stock/`）**、**室內設計（`/interior/`）**、**旅遊規劃（`/travel/`）**：所有登入的使用者都能用，各自在獨立的 repo 開發（見下方「子網站」）
 - 權限由 Firestore Security Rules 把關（見 `firestore.rules`，規格見 `CONTRACTS.md`）
 
-## 子網站：台股分析與室內設計
+## 子網站：台股分析、室內設計與旅遊規劃
 
-兩個子網站都在**自己的 repo 開發**，Claude Flow 不放它們的程式碼，只負責登入、使用者管理與權限：
+三個子網站都在**自己的 repo 開發**，Claude Flow 不放它們的程式碼，只負責登入、使用者管理與權限：
 
-| | 台股分析 `/stock/` | 室內設計 `/interior/` |
-|---|---|---|
-| repo | [`tw-stock-analysis`](https://github.com/chenyu0502/tw-stock-analysis) | [`Interior_Decoration`](https://github.com/chenyu0502/Interior_Decoration) |
-| 類型 | React + Vite，有後端 API（`/api/*`） | 純靜態網頁 |
-| 怎麼接上 Claude Flow | `vercel.json` 把 `/stock/*`、`/api/*` **轉送**到台股自己的 Vercel 專案（tw-stock-analysis.vercel.app） | 每次建置時 `scripts/fetch-interior.mjs` 下載最新的 `main`，放進 `public/interior/` |
-| 更新怎麼上線 | 台股 repo 合併到 `master` 部署完就生效，Claude Flow 不用重新部署 | 室內設計 repo 合併到 `main` 後，GitHub Actions 透過 Deploy Hook 通知 Claude Flow 重新部署 |
+| | 台股分析 `/stock/` | 室內設計 `/interior/` | 旅遊規劃 `/travel/` |
+|---|---|---|---|
+| repo | [`tw-stock-analysis`](https://github.com/chenyu0502/tw-stock-analysis) | [`Interior_Decoration`](https://github.com/chenyu0502/Interior_Decoration) | [`travel-planner`](https://github.com/chenyu0502/travel-planner) |
+| 類型 | React + Vite，有後端 API（`/api/*`） | 純靜態網頁 | 純靜態網頁（不呼叫任何 API） |
+| 怎麼接上 Claude Flow | `vercel.json` 把 `/stock/*`、`/api/*` **轉送**到台股自己的 Vercel 專案（tw-stock-analysis.vercel.app） | 每次建置時 `scripts/fetch-interior.mjs` 下載最新的 `main`，放進 `public/interior/` | 每次建置時 `scripts/fetch-travel.mjs` 下載最新的 `main`，放進 `public/travel/` |
+| 更新怎麼上線 | 台股 repo 合併到 `master` 部署完就生效，Claude Flow 不用重新部署 | 室內設計 repo 合併到 `main` 後，GitHub Actions 透過 Deploy Hook 通知 Claude Flow 重新部署 | 同室內設計（Deploy Hook，Secret 名稱 `VERCEL_DEPLOY_HOOK`） |
+| 公開頁面 | 無 | 唯讀分享連結（`#share=`、`?g=`）與 `ar.html` 不需登入 | 無，一律要求登入（行程含出發日期與住宿） |
 
 - **共用登入**：瀏覽器看到的都是 Claude Flow 的網域，兩個子網站與 Claude Flow 使用同一個 Firebase 專案與設定，登入狀態自動共用。台股專案的 `VITE_FIREBASE_*` 必須與 Claude Flow 完全相同。
-- **權限**：子網站都先確認 `users/{uid}` 存在、未停用、Email 已驗證（Email/密碼帳號），才顯示畫面。這份判斷在兩個 repo 各有一份（Claude Flow 的 `src/auth/emailVerification.ts`、`src/interior-access.ts`；台股的 `src/claudeFlow/`），**改登入規則時兩邊要一起改**。
+- **權限**：子網站都先確認 `users/{uid}` 存在、未停用、Email 已驗證（Email/密碼帳號），才顯示畫面。這份判斷有兩份（Claude Flow 的 `src/auth/emailVerification.ts`、`src/subsite-access.ts`；台股的 `src/claudeFlow/`），**改登入規則時兩邊要一起改**。
+- **靜態子網站的共用流程**：下載與插入登入檢查在 `scripts/fetch-subsite.mjs`，登入檢查在 `src/subsite-gate.ts`；各子網站只有一個設定檔（`scripts/fetch-<名稱>.mjs`）與一個入口（`src/<名稱>-gate.ts`）。要新增靜態子網站，照旅遊規劃的做法加這兩個檔案，再補 `vite.config.ts` 的 `STATIC_SUBSITES`、`vercel.json` 的轉址、`package.json` 的 `predev` 與 `build`、`.gitignore`。
 - **Firestore 規則只有一份**，在本 repo 的 `firestore.rules`，包含台股的 `portfolios`。台股 repo 不放規則。
 - 台股的架構細節（持股隔離、API 登入驗證、Gemini 金鑰）見台股 repo 的 README。
 

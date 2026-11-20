@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
-import { History, LogOut, Sofa, TrendingUp, Users } from 'lucide-react';
+import { History, LogOut, Plane, Sofa, TrendingUp, Users } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import BrandMark from './BrandMark';
 import StyleToggle from './StyleToggle';
@@ -72,9 +72,12 @@ export default function NavBar() {
           {loading ? null : user ? (
             <>
               <div className="navbar-links">
-                {/* 室內設計、台股分析是獨立頁面，用一般連結整頁切換，不走 React Router */}
+                {/* 室內設計、旅遊規劃、台股分析是獨立頁面，用一般連結整頁切換，不走 React Router */}
                 <a href="/interior/" className="nav-link">
                   <NavItem icon={<Sofa size={iconSize} aria-hidden="true" />} label="室內設計" />
+                </a>
+                <a href="/travel/" className="nav-link">
+                  <NavItem icon={<Plane size={iconSize} aria-hidden="true" />} label="旅遊規劃" />
                 </a>
                 <a href="/stock/" className="nav-link">
                   <NavItem icon={<TrendingUp size={iconSize} aria-hidden="true" />} label="台股分析" />

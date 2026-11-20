@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, ShieldCheck, Sofa, TrendingUp, UserRound, Users } from 'lucide-react';
+import { ArrowRight, Plane, ShieldCheck, Sofa, TrendingUp, UserRound, Users } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { VerifyEmailNotice } from '../auth/guards';
 import { formatTimestamp } from './ProfilePage';
@@ -18,7 +18,7 @@ function greeting(now = new Date()): string {
 
 interface AppCardProps {
   href: string;
-  /** 獨立頁面（/interior/、/stock/）用一般連結整頁切換；站內頁用 React Router */
+  /** 獨立頁面（/interior/、/travel/、/stock/）用一般連結整頁切換；站內頁用 React Router */
   external?: boolean;
   icon: ReactNode;
   tone?: '' | 'sage' | 'gold';
@@ -130,6 +130,14 @@ export default function HomePage() {
           icon={<Sofa size={22} aria-hidden="true" />}
           title="室內設計"
           description="2D 平面圖即時生成 3D、拖拉家具門窗、風格模板 AI 自動設計。"
+        />
+        <AppCard
+          href="/travel/"
+          external
+          tone="sage"
+          icon={<Plane size={22} aria-hidden="true" />}
+          title="旅遊規劃"
+          description="輸入目的地與天數，用 Claude 排出每日動線、預算、行前清單與注意事項的旅遊手冊。"
         />
         <AppCard
           href="/stock/"
