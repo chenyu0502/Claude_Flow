@@ -20,7 +20,11 @@ declare global {
 
 startSubsiteGate('旅遊規劃', {
   onAllow(user, profile) {
-    const bridge = createTravelBridge(db, { uid: user.uid, name: profile.displayName ?? user.displayName ?? null });
+    const bridge = createTravelBridge(
+      db,
+      { uid: user.uid, name: profile.displayName ?? user.displayName ?? null },
+      () => user.getIdToken(),
+    );
     window.ClaudeFlowTravel = bridge;
     window.dispatchEvent(new CustomEvent('claudeflow:travel-ready', { detail: bridge }));
   },

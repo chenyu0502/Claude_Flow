@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { serializeTrip, tripTitle, TRIP_JSON_MAX, TRIP_TITLE_MAX } from './travel-store';
+import { searchFlights, serializeTrip, tripTitle, TRIP_JSON_MAX, TRIP_TITLE_MAX } from './travel-store';
 
 describe('tripTitle', () => {
   it('取行程的標題並去除前後空白', () => {
@@ -29,5 +29,32 @@ describe('serializeTrip', () => {
 
   it('超過上限時報錯，不送出注定被規則拒絕的寫入', () => {
     expect(() => serializeTrip({ note: 'x'.repeat(TRIP_JSON_MAX) })).toThrow(/太大/);
+  });
+});
+
+describe('searchFlights', () => {
+  const params = { airline: '中華航空', from: 'TPE', to: 'KIX', outDate: '2026-12-03', backDate: '2026-12-07' };
+  const json = (status: number, body: unknown) =>
+    vi.fn(async () => ({ ok: status < 400, status, json: async () => body }) as unknown as Response);
+
+  it('帶登入憑證呼叫 /api/travel/flights，回傳結果', async () => {
+    const fetchImpl = json(200, { available: true, airline: '中華航空', outbound: [], inbound: [] });
+    const r = await searchFlights(async () => 'tok', params, fetchImpl);
+    expect(r.available).toBe(true);
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('/api/travel/flights');
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer tok');
+    expect(JSON.parse(String(init.body))).toEqual(params);
+  });
+
+  it('伺服器回錯誤時轉成可讀的原因，不丟出例外', async () => {
+    const r = await searchFlights(async () => 'tok', params, json(401, { error: '請先登入' }));
+    expect(r).toEqual({ available: false, reason: '請先登入' });
+  });
+
+  it('取不到登入憑證或連不上伺服器時回報原因', async () => {
+    expect((await searchFlights(async () => { throw new Error('x'); }, params, json(200, {}))).reason).toMatch(/登入狀態/);
+    const down = vi.fn(async () => { throw new Error('net'); }) as unknown as typeof fetch;
+    expect((await searchFlights(async () => 'tok', params, down)).reason).toMatch(/連不上/);
   });
 });

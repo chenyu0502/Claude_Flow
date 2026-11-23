@@ -41,6 +41,44 @@ function subsiteDevIndex(): Plugin {
   };
 }
 
+/**
+ * 開發伺服器上的旅遊規劃 API（/api/travel/*）。
+ *
+ * 正式環境由 Vercel 把 api/travel/*.js 部署成 serverless function；本機 vite dev 沒有這層，
+ * 這裡用 ssrLoadModule 載入同一個檔案，並補上 Vercel 的 req.body、res.status().json() 介面，
+ * 讓開發與正式環境走同一段程式。其餘 /api/* 仍轉送到台股的開發伺服器（見下方 proxy）。
+ */
+function travelApiDev(env: Record<string, string>): Plugin {
+  return {
+    name: 'travel-api-dev',
+    apply: 'serve',
+    configureServer(server) {
+      // adapter 從 process.env 讀設定（GEMINI_API_KEY、VITE_FIREBASE_PROJECT_ID、VITE_USE_EMULATOR）
+      for (const [k, v] of Object.entries(env)) if (process.env[k] === undefined) process.env[k] = v;
+      server.middlewares.use(async (req, res, next) => {
+        const path = (req.url ?? '').split('?')[0];
+        const m = /^\/api\/travel\/([a-z-]+)$/.exec(path);
+        if (!m) return next();
+        try {
+          const chunks: Buffer[] = [];
+          for await (const c of req) chunks.push(c as Buffer);
+          const raw = Buffer.concat(chunks).toString('utf8');
+          const body = raw ? JSON.parse(raw) : {};
+          const mod = await server.ssrLoadModule(`/api/travel/${m[1]}.js`);
+          const shim = Object.assign(res, {
+            status(code: number) { res.statusCode = code; return shim; },
+            json(data: unknown) { res.setHeader('Content-Type', 'application/json; charset=utf-8'); res.end(JSON.stringify(data)); },
+          });
+          await mod.default(Object.assign(req, { body, query: {} }), shim);
+        } catch (err) {
+          res.statusCode = 500;
+          res.end(JSON.stringify({ error: (err as Error).message }));
+        }
+      });
+    },
+  };
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   // 台股分析在獨立 repo（tw-stock-analysis）開發與部署，正式環境由 vercel.json 把 /stock、/api 轉送過去。
@@ -50,14 +88,15 @@ export default defineConfig(({ mode }) => {
   const buildId = resolveBuildId();
 
   return {
-    plugins: [react(), subsiteDevIndex(), versionPlugin(buildId)],
+    plugins: [react(), subsiteDevIndex(), versionPlugin(buildId), travelApiDev(env)],
     // 新版偵測：編譯進程式的版本識別碼，與伺服器上的 /version.json 比對（src/components/UpdateBanner.tsx）。
     define: { __BUILD_ID__: JSON.stringify(buildId) },
     server: {
       port: 5173,
       proxy: {
         '/stock': { target: stockDevUrl, changeOrigin: true, ws: true },
-        '/api': { target: stockDevUrl, changeOrigin: true },
+        // /api/travel/* 由上面的 travelApiDev 在本機處理，其餘轉送到台股
+        '^/api/(?!travel/)': { target: stockDevUrl, changeOrigin: true },
       },
     },
     build: {
@@ -83,7 +122,7 @@ export default defineConfig(({ mode }) => {
     test: {
       globals: true,
       environment: 'jsdom',
-      include: ['src/**/*.test.{ts,tsx,js}', 'scripts/**/*.test.mjs'],
+      include: ['src/**/*.test.{ts,tsx,js}', 'scripts/**/*.test.mjs', 'api/**/*.test.js'],
       setupFiles: ['src/test/setup.ts'],
     },
   };

@@ -39,9 +39,33 @@ export interface TripRecord extends TripSummary {
   isOwner: boolean;
 }
 
+/** 航班查詢的條件（/api/travel/flights） */
+export interface FlightSearchParams {
+  airline: string;
+  from: string;
+  to: string;
+  outDate?: string;
+  backDate?: string;
+}
+
+/** 航班查詢的結果；available 為 false 時 reason 說明原因 */
+export interface FlightSearchResult {
+  available: boolean;
+  reason?: string;
+  airline?: string;
+  outbound?: unknown[];
+  inbound?: unknown[];
+  note?: string;
+  sources?: { title: string; uri: string }[];
+  model?: string;
+  fetchedAt?: string;
+}
+
 /** 提供給旅遊規劃頁面的介面（window.ClaudeFlowTravel） */
 export interface TravelBridge {
   user: { uid: string; name: string | null };
+  /** 由後端（Gemini＋Google 搜尋）查詢某家航空在出發日、回程日的直飛航班 */
+  searchFlights(params: FlightSearchParams): Promise<FlightSearchResult>;
   listMyTrips(): Promise<TripSummary[]>;
   getTrip(id: string): Promise<TripRecord | null>;
   /** id 為 null 時新增並回傳新 ID；否則更新自己的行程 */
@@ -66,12 +90,55 @@ export function serializeTrip(data: unknown): string {
   return json;
 }
 
-export function createTravelBridge(db: Firestore, user: { uid: string; name: string | null }): TravelBridge {
+/**
+ * 呼叫 /api/travel/flights。登入憑證由 Claude Flow 取得並帶在 Authorization 標頭，
+ * 旅遊規劃頁面不需要處理登入。失敗時一律回傳 available: false 與可讀的原因，不丟出例外。
+ */
+export async function searchFlights(
+  getIdToken: () => Promise<string>,
+  params: FlightSearchParams,
+  fetchImpl: typeof fetch = fetch,
+): Promise<FlightSearchResult> {
+  let token: string;
+  try {
+    token = await getIdToken();
+  } catch {
+    return { available: false, reason: '無法取得登入狀態，請重新整理頁面後再試。' };
+  }
+  let res: Response;
+  try {
+    res = await fetchImpl('/api/travel/flights', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(params),
+    });
+  } catch {
+    return { available: false, reason: '連不上伺服器，請確認網路後再試。' };
+  }
+  let body: Partial<FlightSearchResult> & { error?: string } = {};
+  try {
+    body = await res.json();
+  } catch {
+    /* 非 JSON 回應（例如逾時的 504） */
+  }
+  if (!res.ok) return { available: false, reason: body.error || `查詢失敗（HTTP ${res.status}），請稍後再試。` };
+  return { available: !!body.available, ...body } as FlightSearchResult;
+}
+
+export function createTravelBridge(
+  db: Firestore,
+  user: { uid: string; name: string | null },
+  getIdToken: () => Promise<string> = async () => {
+    throw new Error('no token');
+  },
+): TravelBridge {
   const trips = collection(db, 'trips');
   const ownerName = user.name ? user.name.slice(0, OWNER_NAME_MAX) : null;
 
   return {
     user,
+
+    searchFlights: (params) => searchFlights(getIdToken, params),
 
     async listMyTrips() {
       // 只用 ownerUid 篩選、在前端排序，不需要額外建立複合索引。
