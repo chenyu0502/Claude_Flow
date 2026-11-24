@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest';
-import { buildPrompt, hotelsHandler, nightsOf, normalizeResult, parseInput } from './hotels.js';
+import { buildPrompt, hotelsHandler, nightsOf, normalizeRatings, normalizeResult, parseInput } from './hotels.js';
 
 const INPUT = { area: '京都站', city: '京都', checkIn: '2026-12-03', checkOut: '2026-12-06', adults: 2, seniors: 1, kids: 0, level: '舒適', budgetPerNight: 8000 };
 
@@ -39,13 +39,43 @@ describe('buildPrompt', () => {
 describe('normalizeResult', () => {
   it('捨棄沒有名稱的飯店，清掉不合理的數字與不安全的網址', () => {
     const r = normalizeResult({ hotels: [
-      { name: 'MIMARU 京都站', pricePerNightTwd: 7800, rooms: 1, rating: 8.9, walkMin: 5, source: 'https://a.example' },
+      { name: 'MIMARU 京都站', pricePerNightTwd: 7800, rooms: 1, starClass: 3, ratings: [{ site: 'Booking.com', score: 8.9, outOf: 10, reviews: 1520 }], walkMin: 5, source: 'https://a.example' },
       { name: '', pricePerNightTwd: 5000 },
       { name: '某旅館', pricePerNightTwd: -1, rating: 99, walkMin: 999, rooms: 0, source: 'javascript:alert(1)' },
     ], note: 'n' });
     expect(r.hotels).toHaveLength(2);
-    expect(r.hotels[0]).toMatchObject({ name: 'MIMARU 京都站', pricePerNightTwd: 7800, rating: 8.9, walkMin: 5, rooms: 1 });
-    expect(r.hotels[1]).toMatchObject({ pricePerNightTwd: null, rating: null, walkMin: null, rooms: 1, source: '' });
+    expect(r.hotels[0]).toMatchObject({ name: 'MIMARU 京都站', pricePerNightTwd: 7800, starClass: 3, walkMin: 5, rooms: 1 });
+    expect(r.hotels[0].ratings).toEqual([{ site: 'Booking.com', score: 8.9, outOf: 10, reviews: 1520 }]);
+    expect(r.hotels[1]).toMatchObject({ pricePerNightTwd: null, ratings: [], starClass: null, walkMin: null, rooms: 1, source: '' });
+  });
+});
+
+describe('normalizeRatings', () => {
+  it('保留合理的評分，最多 3 個網站，重複網站只留一筆', () => {
+    const r = normalizeRatings({ ratings: [
+      { site: 'Google', score: 4.3, outOf: 5, reviews: 2345 },
+      { site: 'Booking.com', score: 8.7, outOf: 10, reviews: 0 },
+      { site: 'google', score: 4.1, outOf: 5 },
+      { site: 'Agoda', score: 12, outOf: 10 },
+      { site: 'TripAdvisor', score: 4.5, outOf: 7 },
+      { site: 'Jalan', score: 4.4, outOf: 5 },
+      { site: 'Rakuten', score: 4.2, outOf: 5 },
+    ] });
+    expect(r).toEqual([
+      { site: 'Google', score: 4.3, outOf: 5, reviews: 2345 },
+      { site: 'Booking.com', score: 8.7, outOf: 10, reviews: null },
+      { site: 'Jalan', score: 4.4, outOf: 5, reviews: null },
+    ]);
+  });
+  it('舊格式 rating＋ratingNote 轉成一筆', () => {
+    expect(normalizeRatings({ rating: 8.9, ratingNote: 'Booking 10 分制' })).toEqual([{ site: 'Booking', score: 8.9, outOf: 10, reviews: null }]);
+    expect(normalizeRatings({ rating: 4.2, ratingNote: 'Google 5 分制' })).toEqual([{ site: 'Google', score: 4.2, outOf: 5, reviews: null }]);
+  });
+  it('提示詞要求評比與星級', () => {
+    const p = buildPrompt(parseInput(INPUT).value);
+    expect(p).toContain('ratings');
+    expect(p).toContain('starClass');
+    expect(p).toContain('reviews');
   });
 });
 

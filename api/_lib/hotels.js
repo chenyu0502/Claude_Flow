@@ -65,12 +65,39 @@ export function buildPrompt(v) {
 1. 以「${v.area}」為中心，步行或搭車 20 分鐘內為主；walkMin 是步行到該地點或最近車站的分鐘數，access 寫最近的車站與步行時間。
 2. 涵蓋不同價位；有長輩或兒童時，優先列出有家庭房、電梯、離車站近的飯店。
 3. pricePerNightTwd 是這組旅伴「全體每晚」的參考價（新台幣整數，含稅），以這個日期或最接近日期在訂房網站、官網看到的價格為準；查不到填 0，不要估算。rooms 是需要幾間房，roomNote 寫房型（例如「家庭房 4 人 1 間」「雙人房 2 間」）。
-4. rating 是訂房網站或 Google 的評分，照原本的分數填寫，並在 ratingNote 寫明來源與滿分（例如「Booking.com 10 分制」「Google 5 分制」），查不到填 0。
+4. ratings 列出網路評比，每個網站一筆（優先 Google、Booking.com、Agoda、TripAdvisor，最多 3 個）：site 網站名稱、score 原始分數、outOf 滿分（例如 5 或 10）、reviews 評論數（查不到填 0）。只填實際查到的，查不到就給空陣列。
+   starClass 是飯店的官方星級（例如 4 代表四星級），沒有或查不到填 0。
 5. highlights 寫 1～2 句優點；cautions 寫需要注意的地方（例如房間小、無電梯、需另付清潔費），沒有就留空。
 6. nameLocal 寫飯店的當地語言或英文正式名稱，方便地圖與訂房網站搜尋。
 
 最後只回覆一個 \`\`\`json 程式碼區塊，格式：
-{"hotels":[{"name":"","nameLocal":"","area":"","access":"","walkMin":0,"pricePerNightTwd":0,"rooms":1,"roomNote":"","rating":0,"ratingNote":"","highlights":"","cautions":"","source":"https://..."}],"note":""}`;
+{"hotels":[{"name":"","nameLocal":"","area":"","access":"","walkMin":0,"pricePerNightTwd":0,"rooms":1,"roomNote":"","starClass":0,"ratings":[{"site":"Google","score":0,"outOf":5,"reviews":0}],"highlights":"","cautions":"","source":"https://..."}],"note":""}`;
+}
+
+/**
+ * 整理網路評比：每個網站一筆，分數必須介於 0 與滿分之間，滿分只接受 5、10、100。
+ * 舊格式（rating＋ratingNote）也轉成一筆，從說明判斷滿分。
+ */
+export function normalizeRatings(x) {
+  const list = Array.isArray(x?.ratings) ? x.ratings : [];
+  if (!list.length && Number(x?.rating) > 0) {
+    const note = String(x?.ratingNote ?? '');
+    const outOf = /5\s*分制|\/\s*5\b|5 分滿分/.test(note) || Number(x.rating) <= 5 ? 5 : 10;
+    list.push({ site: note.replace(/\s*\d+\s*分制.*$/, '').trim() || '網路評分', score: x.rating, outOf });
+  }
+  const seen = new Set();
+  const out = [];
+  for (const r of list) {
+    const site = String(r?.site ?? '').trim().slice(0, 30);
+    const outOf = Number(r?.outOf);
+    const score = Math.round((Number(r?.score) || 0) * 10) / 10;
+    if (!site || ![5, 10, 100].includes(outOf) || !(score > 0 && score <= outOf) || seen.has(site.toLowerCase())) continue;
+    seen.add(site.toLowerCase());
+    const reviews = Math.round(Number(r?.reviews) || 0);
+    out.push({ site, score, outOf, reviews: reviews > 0 && reviews < 10000000 ? reviews : null });
+    if (out.length >= 3) break;
+  }
+  return out;
 }
 
 /** 檢查模型回傳的單一飯店，格式不對的欄位清空，沒有名稱的整筆捨棄。 */
@@ -78,7 +105,6 @@ function normalizeHotel(x) {
   const name = String(x?.name ?? '').trim().slice(0, 80);
   if (!name) return null;
   const int = (v, max) => { const n = Math.round(Number(v) || 0); return n > 0 && n <= max ? n : null; };
-  const num1 = (v, max) => { const n = Math.round((Number(v) || 0) * 10) / 10; return n > 0 && n <= max ? n : null; };
   const source = String(x?.source ?? '');
   return {
     name,
@@ -89,8 +115,8 @@ function normalizeHotel(x) {
     pricePerNightTwd: int(x?.pricePerNightTwd, 500000),
     rooms: int(x?.rooms, 10) ?? 1,
     roomNote: String(x?.roomNote ?? '').slice(0, 60),
-    rating: num1(x?.rating, 10),
-    ratingNote: String(x?.ratingNote ?? '').slice(0, 40),
+    starClass: int(x?.starClass, 5),
+    ratings: normalizeRatings(x),
     highlights: String(x?.highlights ?? '').slice(0, 160),
     cautions: String(x?.cautions ?? '').slice(0, 160),
     source: /^https?:\/\/[^\s"'<>]+$/i.test(source) ? source : '',
