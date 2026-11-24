@@ -21,6 +21,12 @@ describe('parseInput', () => {
 });
 
 describe('buildPrompt', () => {
+  it('要求查詢參考票價與託運行李', () => {
+    const p = buildPrompt(parseInput(INPUT).value);
+    expect(p).toContain('fareTwd');
+    expect(p).toContain('baggage');
+    expect(p).toMatch(/查不到就填 0，不要估算/);
+  });
   it('包含航空公司、兩個方向與日期，並要求 JSON', () => {
     const p = buildPrompt(parseInput(INPUT).value);
     expect(p).toContain('「中華航空」');
@@ -47,6 +53,23 @@ describe('normalizeResult', () => {
     expect(ci152.source).toBe('');
     expect(r.inbound).toEqual([]);
     expect(r.note).toBe('依冬季班表');
+  });
+});
+
+describe('normalizeResult：票價與行李', () => {
+  it('保留合理的票價與行李，不合理的票價視為查不到', () => {
+    const r = normalizeResult({ outbound: [
+      { flightNo: 'CI152', depart: '09:45', fareTwd: 6800, fareNote: '官網促銷價', baggage: '託運 23 公斤 1 件' },
+      { flightNo: 'IT210', depart: '06:40', fareTwd: '3,200' },
+      { flightNo: 'IT212', depart: '15:15', fareTwd: 0, baggage: '基本票價不含託運，需加購' },
+      { flightNo: 'JX820', depart: '07:40', fareTwd: 999999 },
+    ] });
+    const by = Object.fromEntries(r.outbound.map((f) => [f.flightNo, f]));
+    expect(by.CI152).toMatchObject({ fareTwd: 6800, fareNote: '官網促銷價', baggage: '託運 23 公斤 1 件' });
+    expect(by.IT210.fareTwd).toBeNull();
+    expect(by.IT212.fareTwd).toBeNull();
+    expect(by.IT212.baggage).toMatch(/不含託運/);
+    expect(by.JX820.fareTwd).toBeNull();
   });
 });
 

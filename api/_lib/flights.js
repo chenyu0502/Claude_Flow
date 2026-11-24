@@ -46,8 +46,13 @@ export function buildPrompt({ airline, from, to, outDate, backDate }) {
 若這兩天的正式班表還沒公布，用最接近日期的班表推估，並在該班的 note 寫明依據哪一天或哪個航季。
 查不到這家航空在此航線有直飛航班時，outbound、inbound 回傳空陣列，在 note 說明。
 
+另外查兩項資訊：
+- 票價：每位成人「單程、經濟艙」的參考票價（新台幣整數，含稅），以該日期或最接近日期在航空公司官網、促銷頁、旅遊網站上看到的價格為準；
+  查不到就填 0，不要估算。fareNote 寫明價格的來源網站、查到的日期或票種（例如「官網促銷價，未含行李」）。
+- 行李：經濟艙基本票種的託運行李額度（例如「託運 23 公斤 1 件」）；廉價航空若基本票價不含託運，寫「基本票價不含託運，需加購」並附加購參考價。
+
 最後只回覆一個 \`\`\`json 程式碼區塊，格式如下（durationMin 為飛行分鐘數，days 寫每週飛哪幾天，不確定留空）：
-{"outbound":[{"flightNo":"","depart":"HH:MM","arrive":"HH:MM","durationMin":0,"days":"","note":"","source":"https://..."}],"inbound":[{"flightNo":"","depart":"HH:MM","arrive":"HH:MM","durationMin":0,"days":"","note":"","source":"https://..."}],"note":""}`;
+{"outbound":[{"flightNo":"","depart":"HH:MM","arrive":"HH:MM","durationMin":0,"days":"","fareTwd":0,"fareNote":"","baggage":"","note":"","source":"https://..."}],"inbound":[{"flightNo":"","depart":"HH:MM","arrive":"HH:MM","durationMin":0,"days":"","fareTwd":0,"fareNote":"","baggage":"","note":"","source":"https://..."}],"note":""}`;
 }
 
 /** 檢查模型回傳的單一航班，格式不對的欄位清空，班號不合理的整筆捨棄。 */
@@ -62,6 +67,10 @@ function normalizeFlight(x) {
     arrive: time(x?.arrive),
     durationMin: Math.max(0, Math.round(Number(x?.durationMin) || 0)) || null,
     days: String(x?.days ?? '').slice(0, 30),
+    // 每位成人單程經濟艙的參考票價；不合理的數字（0、負數、超過 20 萬）一律視為查不到
+    fareTwd: (() => { const n = Math.round(Number(x?.fareTwd) || 0); return n > 0 && n <= 200000 ? n : null; })(),
+    fareNote: String(x?.fareNote ?? '').slice(0, 100),
+    baggage: String(x?.baggage ?? '').slice(0, 60),
     note: String(x?.note ?? '').slice(0, 160),
     source: /^https?:\/\/[^\s"'<>]+$/i.test(source) ? source : '',
   };
