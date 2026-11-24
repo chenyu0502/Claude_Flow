@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { searchFlights, serializeTrip, tripTitle, TRIP_JSON_MAX, TRIP_TITLE_MAX } from './travel-store';
+import { searchFlights, searchHotels, serializeTrip, tripTitle, TRIP_JSON_MAX, TRIP_TITLE_MAX } from './travel-store';
 
 describe('tripTitle', () => {
   it('取行程的標題並去除前後空白', () => {
@@ -56,5 +56,16 @@ describe('searchFlights', () => {
     expect((await searchFlights(async () => { throw new Error('x'); }, params, json(200, {}))).reason).toMatch(/登入狀態/);
     const down = vi.fn(async () => { throw new Error('net'); }) as unknown as typeof fetch;
     expect((await searchFlights(async () => 'tok', params, down)).reason).toMatch(/連不上/);
+  });
+});
+
+describe('searchHotels', () => {
+  it('呼叫 /api/travel/hotels 並帶登入憑證', async () => {
+    const fetchImpl = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ available: true, hotels: [] }) }) as unknown as Response);
+    const r = await searchHotels(async () => 'tok', { area: '京都站', adults: 2 }, fetchImpl);
+    expect(r.available).toBe(true);
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('/api/travel/hotels');
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer tok');
   });
 });

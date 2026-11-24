@@ -61,11 +61,42 @@ export interface FlightSearchResult {
   fetchedAt?: string;
 }
 
+/** 飯店查詢的條件（/api/travel/hotels） */
+export interface HotelSearchParams {
+  area: string;
+  city?: string;
+  checkIn?: string;
+  checkOut?: string;
+  adults: number;
+  seniors?: number;
+  kids?: number;
+  kidAges?: string;
+  level?: string;
+  budgetPerNight?: number;
+  notes?: string;
+}
+
+/** 飯店查詢的結果；available 為 false 時 reason 說明原因 */
+export interface HotelSearchResult {
+  available: boolean;
+  reason?: string;
+  area?: string;
+  checkIn?: string;
+  checkOut?: string;
+  hotels?: unknown[];
+  note?: string;
+  sources?: { title: string; uri: string }[];
+  model?: string;
+  fetchedAt?: string;
+}
+
 /** 提供給旅遊規劃頁面的介面（window.ClaudeFlowTravel） */
 export interface TravelBridge {
   user: { uid: string; name: string | null };
   /** 由後端（Gemini＋Google 搜尋）查詢某家航空在出發日、回程日的直飛航班 */
   searchFlights(params: FlightSearchParams): Promise<FlightSearchResult>;
+  /** 由後端（Gemini＋Google 搜尋）查詢某個地區或景點附近的飯店 */
+  searchHotels(params: HotelSearchParams): Promise<HotelSearchResult>;
   listMyTrips(): Promise<TripSummary[]>;
   getTrip(id: string): Promise<TripRecord | null>;
   /** id 為 null 時新增並回傳新 ID；否則更新自己的行程 */
@@ -94,35 +125,53 @@ export function serializeTrip(data: unknown): string {
  * 呼叫 /api/travel/flights。登入憑證由 Claude Flow 取得並帶在 Authorization 標頭，
  * 旅遊規劃頁面不需要處理登入。失敗時一律回傳 available: false 與可讀的原因，不丟出例外。
  */
-export async function searchFlights(
+export function searchFlights(
   getIdToken: () => Promise<string>,
   params: FlightSearchParams,
   fetchImpl: typeof fetch = fetch,
 ): Promise<FlightSearchResult> {
+  return callTravelApi<FlightSearchResult>('/api/travel/flights', getIdToken, params, fetchImpl);
+}
+
+/** 呼叫 /api/travel/hotels，行為同 searchFlights。 */
+export function searchHotels(
+  getIdToken: () => Promise<string>,
+  params: HotelSearchParams,
+  fetchImpl: typeof fetch = fetch,
+): Promise<HotelSearchResult> {
+  return callTravelApi<HotelSearchResult>('/api/travel/hotels', getIdToken, params, fetchImpl);
+}
+
+async function callTravelApi<T extends { available: boolean; reason?: string }>(
+  path: string,
+  getIdToken: () => Promise<string>,
+  params: object,
+  fetchImpl: typeof fetch,
+): Promise<T> {
   let token: string;
   try {
     token = await getIdToken();
   } catch {
-    return { available: false, reason: '無法取得登入狀態，請重新整理頁面後再試。' };
+    return { available: false, reason: '無法取得登入狀態，請重新整理頁面後再試。' } as T;
   }
   let res: Response;
   try {
-    res = await fetchImpl('/api/travel/flights', {
+    res = await fetchImpl(path, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify(params),
     });
   } catch {
-    return { available: false, reason: '連不上伺服器，請確認網路後再試。' };
+    return { available: false, reason: '連不上伺服器，請確認網路後再試。' } as T;
   }
-  let body: Partial<FlightSearchResult> & { error?: string } = {};
+  let body: Partial<T> & { error?: string } = {};
   try {
     body = await res.json();
   } catch {
     /* 非 JSON 回應（例如逾時的 504） */
   }
-  if (!res.ok) return { available: false, reason: body.error || `查詢失敗（HTTP ${res.status}），請稍後再試。` };
-  return { available: !!body.available, ...body } as FlightSearchResult;
+  if (!res.ok) return { available: false, reason: body.error || `查詢失敗（HTTP ${res.status}），請稍後再試。` } as T;
+  return { available: !!body.available, ...body } as T;
 }
 
 export function createTravelBridge(
@@ -139,6 +188,7 @@ export function createTravelBridge(
     user,
 
     searchFlights: (params) => searchFlights(getIdToken, params),
+    searchHotels: (params) => searchHotels(getIdToken, params),
 
     async listMyTrips() {
       // 只用 ownerUid 篩選、在前端排序，不需要額外建立複合索引。
