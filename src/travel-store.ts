@@ -183,9 +183,9 @@ export interface KeyCheckResult {
 /** 提供給旅遊規劃頁面的介面（window.ClaudeFlowTravel） */
 export interface TravelBridge {
   user: { uid: string; name: string | null };
-  /** 由後端（Gemini＋Google 搜尋）查詢某家航空在出發日、回程日的直飛航班 */
   /** 測試使用者自己的 Gemini 金鑰 */
   checkGeminiKey(geminiKey: string): Promise<KeyCheckResult>;
+  /** 由後端（Gemini＋Google 搜尋）查詢某家航空在出發日、回程日的直飛航班 */
   searchFlights(params: FlightSearchParams, opts?: CallOptions): Promise<FlightSearchResult>;
   /** 由後端（Gemini＋Google 搜尋）查詢某個地區或景點附近的飯店 */
   searchHotels(params: HotelSearchParams, opts?: CallOptions): Promise<HotelSearchResult>;
