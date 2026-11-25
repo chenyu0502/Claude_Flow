@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { searchFlights, searchHotels, searchRestaurants, searchTickets, searchTransport, serializeTrip, tripTitle, TRIP_JSON_MAX, TRIP_TITLE_MAX } from './travel-store';
+import { checkGeminiKey, searchFlights, searchHotels, searchRestaurants, searchTickets, searchTransport, serializeTrip, tripTitle, TRIP_JSON_MAX, TRIP_TITLE_MAX } from './travel-store';
 
 describe('tripTitle', () => {
   it('取行程的標題並去除前後空白', () => {
@@ -94,5 +94,28 @@ describe('searchRestaurants', () => {
     const r = await searchRestaurants(async () => 'tok', { area: '祇園', adults: 2 }, fetchImpl);
     expect(r.available).toBe(true);
     expect((fetchImpl.mock.calls[0] as unknown as [string])[0]).toBe('/api/travel/restaurants');
+  });
+});
+
+describe('使用者自己的 Gemini 金鑰', () => {
+  const ok = (body: unknown) => vi.fn(async () => ({ ok: true, status: 200, json: async () => body }) as unknown as Response);
+  const headersOf = (f: ReturnType<typeof ok>) => (f.mock.calls[0] as unknown as [string, RequestInit])[1].headers as Record<string, string>;
+
+  it('有金鑰時放在 X-Gemini-Key 標頭，不放進請求內容', async () => {
+    const fetchImpl = ok({ available: true });
+    await searchHotels(async () => 'tok', { area: '京都站', adults: 2 }, fetchImpl, { geminiKey: 'AIzaUserKey_1234567890' });
+    expect(headersOf(fetchImpl)['X-Gemini-Key']).toBe('AIzaUserKey_1234567890');
+    expect(String((fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1].body)).not.toContain('AIzaUserKey');
+  });
+
+  it('沒有金鑰時不帶這個標頭', async () => {
+    const fetchImpl = ok({ available: true });
+    await searchFlights(async () => 'tok', { airline: 'x', from: 'TPE', to: 'KIX' }, fetchImpl);
+    expect(headersOf(fetchImpl)).not.toHaveProperty('X-Gemini-Key');
+  });
+
+  it('checkGeminiKey 回報有效或無效的原因', async () => {
+    expect(await checkGeminiKey(async () => 'tok', 'k', ok({ ok: true, models: 5, hasDefault: true }))).toEqual({ ok: true, models: 5, hasDefault: true });
+    expect(await checkGeminiKey(async () => 'tok', 'k', ok({ ok: false, reason: '金鑰無效' }))).toEqual({ ok: false, reason: '金鑰無效' });
   });
 });

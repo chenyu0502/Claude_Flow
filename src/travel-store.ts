@@ -167,19 +167,34 @@ export interface RestaurantSearchResult {
   fetchedAt?: string;
 }
 
+/** 每次查詢的選項：使用者自己的 Gemini 金鑰（只放在請求標頭 X-Gemini-Key，後端優先使用） */
+export interface CallOptions {
+  geminiKey?: string;
+}
+
+/** 金鑰檢查的結果 */
+export interface KeyCheckResult {
+  ok: boolean;
+  reason?: string;
+  models?: number;
+  hasDefault?: boolean;
+}
+
 /** 提供給旅遊規劃頁面的介面（window.ClaudeFlowTravel） */
 export interface TravelBridge {
   user: { uid: string; name: string | null };
+  /** 測試使用者自己的 Gemini 金鑰 */
+  checkGeminiKey(geminiKey: string): Promise<KeyCheckResult>;
   /** 由後端（Gemini＋Google 搜尋）查詢某家航空在出發日、回程日的直飛航班 */
-  searchFlights(params: FlightSearchParams): Promise<FlightSearchResult>;
+  searchFlights(params: FlightSearchParams, opts?: CallOptions): Promise<FlightSearchResult>;
   /** 由後端（Gemini＋Google 搜尋）查詢某個地區或景點附近的飯店 */
-  searchHotels(params: HotelSearchParams): Promise<HotelSearchResult>;
+  searchHotels(params: HotelSearchParams, opts?: CallOptions): Promise<HotelSearchResult>;
   /** 由後端（Gemini＋Google 搜尋）查詢景點門票（一次最多 8 個） */
-  searchTickets(params: TicketSearchParams): Promise<TicketSearchResult>;
+  searchTickets(params: TicketSearchParams, opts?: CallOptions): Promise<TicketSearchResult>;
   /** 由後端（Gemini＋Google 搜尋）依行程的移動段分析交通票券 */
-  searchTransport(params: TransportSearchParams): Promise<TransportSearchResult>;
+  searchTransport(params: TransportSearchParams, opts?: CallOptions): Promise<TransportSearchResult>;
   /** 由後端（Gemini＋Google 搜尋）查詢某個地點附近的餐廳與訂位方式 */
-  searchRestaurants(params: RestaurantSearchParams): Promise<RestaurantSearchResult>;
+  searchRestaurants(params: RestaurantSearchParams, opts?: CallOptions): Promise<RestaurantSearchResult>;
   listMyTrips(): Promise<TripSummary[]>;
   getTrip(id: string): Promise<TripRecord | null>;
   /** id 為 null 時新增並回傳新 ID；否則更新自己的行程 */
@@ -212,8 +227,9 @@ export function searchFlights(
   getIdToken: () => Promise<string>,
   params: FlightSearchParams,
   fetchImpl: typeof fetch = fetch,
+  opts: CallOptions = {},
 ): Promise<FlightSearchResult> {
-  return callTravelApi<FlightSearchResult>('/api/travel/flights', getIdToken, params, fetchImpl);
+  return callTravelApi<FlightSearchResult>('/api/travel/flights', getIdToken, params, fetchImpl, opts.geminiKey);
 }
 
 /** 呼叫 /api/travel/hotels，行為同 searchFlights。 */
@@ -221,8 +237,9 @@ export function searchHotels(
   getIdToken: () => Promise<string>,
   params: HotelSearchParams,
   fetchImpl: typeof fetch = fetch,
+  opts: CallOptions = {},
 ): Promise<HotelSearchResult> {
-  return callTravelApi<HotelSearchResult>('/api/travel/hotels', getIdToken, params, fetchImpl);
+  return callTravelApi<HotelSearchResult>('/api/travel/hotels', getIdToken, params, fetchImpl, opts.geminiKey);
 }
 
 /** 呼叫 /api/travel/tickets，行為同 searchFlights。 */
@@ -230,8 +247,9 @@ export function searchTickets(
   getIdToken: () => Promise<string>,
   params: TicketSearchParams,
   fetchImpl: typeof fetch = fetch,
+  opts: CallOptions = {},
 ): Promise<TicketSearchResult> {
-  return callTravelApi<TicketSearchResult>('/api/travel/tickets', getIdToken, params, fetchImpl);
+  return callTravelApi<TicketSearchResult>('/api/travel/tickets', getIdToken, params, fetchImpl, opts.geminiKey);
 }
 
 /** 呼叫 /api/travel/transport，行為同 searchFlights。 */
@@ -239,8 +257,9 @@ export function searchTransport(
   getIdToken: () => Promise<string>,
   params: TransportSearchParams,
   fetchImpl: typeof fetch = fetch,
+  opts: CallOptions = {},
 ): Promise<TransportSearchResult> {
-  return callTravelApi<TransportSearchResult>('/api/travel/transport', getIdToken, params, fetchImpl);
+  return callTravelApi<TransportSearchResult>('/api/travel/transport', getIdToken, params, fetchImpl, opts.geminiKey);
 }
 
 /** 呼叫 /api/travel/restaurants，行為同 searchFlights。 */
@@ -248,8 +267,21 @@ export function searchRestaurants(
   getIdToken: () => Promise<string>,
   params: RestaurantSearchParams,
   fetchImpl: typeof fetch = fetch,
+  opts: CallOptions = {},
 ): Promise<RestaurantSearchResult> {
-  return callTravelApi<RestaurantSearchResult>('/api/travel/restaurants', getIdToken, params, fetchImpl);
+  return callTravelApi<RestaurantSearchResult>('/api/travel/restaurants', getIdToken, params, fetchImpl, opts.geminiKey);
+}
+
+/** 呼叫 /api/travel/key-check 測試使用者的 Gemini 金鑰（只列出模型，不消耗查詢額度）。 */
+export async function checkGeminiKey(
+  getIdToken: () => Promise<string>,
+  geminiKey: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<KeyCheckResult> {
+  const r = await callTravelApi<{ available: boolean; reason?: string; ok?: boolean; models?: number; hasDefault?: boolean }>(
+    '/api/travel/key-check', getIdToken, {}, fetchImpl, geminiKey);
+  // key-check 回的是 ok 而非 available；callTravelApi 失敗時只有 reason
+  return r.ok ? { ok: true, models: r.models, hasDefault: r.hasDefault } : { ok: false, reason: r.reason || '金鑰檢查失敗，請稍後再試。' };
 }
 
 async function callTravelApi<T extends { available: boolean; reason?: string }>(
@@ -257,6 +289,7 @@ async function callTravelApi<T extends { available: boolean; reason?: string }>(
   getIdToken: () => Promise<string>,
   params: object,
   fetchImpl: typeof fetch,
+  geminiKey?: string,
 ): Promise<T> {
   let token: string;
   try {
@@ -268,7 +301,11 @@ async function callTravelApi<T extends { available: boolean; reason?: string }>(
   try {
     res = await fetchImpl(path, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        ...(geminiKey ? { 'X-Gemini-Key': geminiKey } : {}),
+      },
       body: JSON.stringify(params),
     });
   } catch {
@@ -297,11 +334,12 @@ export function createTravelBridge(
   return {
     user,
 
-    searchFlights: (params) => searchFlights(getIdToken, params),
-    searchHotels: (params) => searchHotels(getIdToken, params),
-    searchTickets: (params) => searchTickets(getIdToken, params),
-    searchTransport: (params) => searchTransport(getIdToken, params),
-    searchRestaurants: (params) => searchRestaurants(getIdToken, params),
+    checkGeminiKey: (geminiKey) => checkGeminiKey(getIdToken, geminiKey),
+    searchFlights: (params, opts) => searchFlights(getIdToken, params, fetch, opts),
+    searchHotels: (params, opts) => searchHotels(getIdToken, params, fetch, opts),
+    searchTickets: (params, opts) => searchTickets(getIdToken, params, fetch, opts),
+    searchTransport: (params, opts) => searchTransport(getIdToken, params, fetch, opts),
+    searchRestaurants: (params, opts) => searchRestaurants(getIdToken, params, fetch, opts),
 
     async listMyTrips() {
       // 只用 ownerUid 篩選、在前端排序，不需要額外建立複合索引。
