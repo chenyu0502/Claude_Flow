@@ -135,6 +135,38 @@ export interface TransportSearchResult {
   fetchedAt?: string;
 }
 
+/** 餐廳查詢的條件（/api/travel/restaurants） */
+export interface RestaurantSearchParams {
+  area: string;
+  city?: string;
+  date?: string;
+  time?: string;
+  meal?: string;
+  cuisine?: string;
+  budgetPerPersonTwd?: number;
+  diet?: string;
+  notes?: string;
+  adults: number;
+  seniors?: number;
+  kids?: number;
+  kidAges?: string;
+}
+
+/** 餐廳查詢的結果；available 為 false 時 reason 說明原因 */
+export interface RestaurantSearchResult {
+  available: boolean;
+  reason?: string;
+  area?: string;
+  date?: string;
+  time?: string;
+  meal?: string;
+  restaurants?: unknown[];
+  note?: string;
+  sources?: { title: string; uri: string }[];
+  model?: string;
+  fetchedAt?: string;
+}
+
 /** 提供給旅遊規劃頁面的介面（window.ClaudeFlowTravel） */
 export interface TravelBridge {
   user: { uid: string; name: string | null };
@@ -146,6 +178,8 @@ export interface TravelBridge {
   searchTickets(params: TicketSearchParams): Promise<TicketSearchResult>;
   /** 由後端（Gemini＋Google 搜尋）依行程的移動段分析交通票券 */
   searchTransport(params: TransportSearchParams): Promise<TransportSearchResult>;
+  /** 由後端（Gemini＋Google 搜尋）查詢某個地點附近的餐廳與訂位方式 */
+  searchRestaurants(params: RestaurantSearchParams): Promise<RestaurantSearchResult>;
   listMyTrips(): Promise<TripSummary[]>;
   getTrip(id: string): Promise<TripRecord | null>;
   /** id 為 null 時新增並回傳新 ID；否則更新自己的行程 */
@@ -209,6 +243,15 @@ export function searchTransport(
   return callTravelApi<TransportSearchResult>('/api/travel/transport', getIdToken, params, fetchImpl);
 }
 
+/** 呼叫 /api/travel/restaurants，行為同 searchFlights。 */
+export function searchRestaurants(
+  getIdToken: () => Promise<string>,
+  params: RestaurantSearchParams,
+  fetchImpl: typeof fetch = fetch,
+): Promise<RestaurantSearchResult> {
+  return callTravelApi<RestaurantSearchResult>('/api/travel/restaurants', getIdToken, params, fetchImpl);
+}
+
 async function callTravelApi<T extends { available: boolean; reason?: string }>(
   path: string,
   getIdToken: () => Promise<string>,
@@ -258,6 +301,7 @@ export function createTravelBridge(
     searchHotels: (params) => searchHotels(getIdToken, params),
     searchTickets: (params) => searchTickets(getIdToken, params),
     searchTransport: (params) => searchTransport(getIdToken, params),
+    searchRestaurants: (params) => searchRestaurants(getIdToken, params),
 
     async listMyTrips() {
       // 只用 ownerUid 篩選、在前端排序，不需要額外建立複合索引。
