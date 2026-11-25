@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { searchFlights, searchHotels, serializeTrip, tripTitle, TRIP_JSON_MAX, TRIP_TITLE_MAX } from './travel-store';
+import { searchFlights, searchHotels, searchTickets, serializeTrip, tripTitle, TRIP_JSON_MAX, TRIP_TITLE_MAX } from './travel-store';
 
 describe('tripTitle', () => {
   it('取行程的標題並去除前後空白', () => {
@@ -67,5 +67,14 @@ describe('searchHotels', () => {
     const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe('/api/travel/hotels');
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer tok');
+  });
+});
+
+describe('searchTickets', () => {
+  it('呼叫 /api/travel/tickets 並帶登入憑證', async () => {
+    const fetchImpl = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ available: true, attractions: [] }) }) as unknown as Response);
+    const r = await searchTickets(async () => 'tok', { attractions: [{ name: '清水寺' }], adults: 2 }, fetchImpl);
+    expect(r.available).toBe(true);
+    expect((fetchImpl.mock.calls[0] as unknown as [string])[0]).toBe('/api/travel/tickets');
   });
 });

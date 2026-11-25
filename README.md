@@ -29,6 +29,7 @@
 - 台股的架構細節（持股隔離、API 登入驗證、Gemini 金鑰）見台股 repo 的 README。
 - **旅遊規劃的航班查詢（`POST /api/travel/flights`）**：照台股分析的後端做法（`api/_lib/auth.js`、`http.js`、`adapter.js` 沿用自台股），只開放給登入且未停用的使用者。後端呼叫 Gemini 並開啟 Google 搜尋，查指定航空公司在出發日、回程日的直飛航班，回傳航班、來源網頁與使用的模型。金鑰：請求帶 `X-Gemini-Key` 時用使用者自己的，否則用 Claude Flow Vercel 專案的 `GEMINI_API_KEY`（可與台股使用同一把免費金鑰）。旅遊規劃頁面透過 `window.ClaudeFlowTravel.searchFlights()` 呼叫，不處理登入。`vercel.json` 讓 `/api/travel/*` 留在本專案，其餘 `/api/*` 照舊轉送台股。
 - **旅遊規劃的飯店查詢（`POST /api/travel/hotels`）**：與航班查詢同一套做法（登入驗證、Gemini＋Google 搜尋、同一把金鑰），依地區或景點、入住與退房日期、旅伴組成與預算，查附近的飯店，回傳區域、交通、全體每晚參考價、房型、評分、優缺點與來源。旅遊規劃頁面透過 `window.ClaudeFlowTravel.searchHotels()` 呼叫。
+- **旅遊規劃的景點門票查詢（`POST /api/travel/tickets`）**：同一套做法，一次最多查 8 個景點：預約狀態（必須預約、建議預約、現場購票、免費）、票種與當地貨幣價格、旅伴合計（新台幣，附匯率）、營業時間與公休日、入場時段、開賣規則、購買管道與來源。網站不代售門票。旅遊規劃頁面透過 `window.ClaudeFlowTravel.searchTickets()` 呼叫。
 - **旅遊規劃的行程（Firestore `trips/{tripId}`）**：旅遊規劃本身不載入 Firebase。`src/travel-gate.ts` 通過登入檢查後，把 `src/travel-store.ts` 的存取介面以 `window.ClaudeFlowTravel` 提供給它。分享方式是「知道連結就能看」：登入且未停用的使用者可以用 ID 讀單一份行程，但只能列出自己的行程；只有建立者能修改與刪除（規則與測試：`firestore.rules`、`tests/rules/trips.rules.test.ts`）。
 
 ## 本地開發（Emulator，不需要真的 Firebase 專案）

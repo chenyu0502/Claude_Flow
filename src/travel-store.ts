@@ -90,6 +90,27 @@ export interface HotelSearchResult {
   fetchedAt?: string;
 }
 
+/** 景點門票查詢的條件（/api/travel/tickets） */
+export interface TicketSearchParams {
+  attractions: { name: string; date?: string; place?: string }[];
+  city?: string;
+  adults: number;
+  seniors?: number;
+  kids?: number;
+  kidAges?: string;
+}
+
+/** 景點門票查詢的結果；available 為 false 時 reason 說明原因 */
+export interface TicketSearchResult {
+  available: boolean;
+  reason?: string;
+  attractions?: unknown[];
+  note?: string;
+  sources?: { title: string; uri: string }[];
+  model?: string;
+  fetchedAt?: string;
+}
+
 /** 提供給旅遊規劃頁面的介面（window.ClaudeFlowTravel） */
 export interface TravelBridge {
   user: { uid: string; name: string | null };
@@ -97,6 +118,8 @@ export interface TravelBridge {
   searchFlights(params: FlightSearchParams): Promise<FlightSearchResult>;
   /** 由後端（Gemini＋Google 搜尋）查詢某個地區或景點附近的飯店 */
   searchHotels(params: HotelSearchParams): Promise<HotelSearchResult>;
+  /** 由後端（Gemini＋Google 搜尋）查詢景點門票（一次最多 8 個） */
+  searchTickets(params: TicketSearchParams): Promise<TicketSearchResult>;
   listMyTrips(): Promise<TripSummary[]>;
   getTrip(id: string): Promise<TripRecord | null>;
   /** id 為 null 時新增並回傳新 ID；否則更新自己的行程 */
@@ -140,6 +163,15 @@ export function searchHotels(
   fetchImpl: typeof fetch = fetch,
 ): Promise<HotelSearchResult> {
   return callTravelApi<HotelSearchResult>('/api/travel/hotels', getIdToken, params, fetchImpl);
+}
+
+/** 呼叫 /api/travel/tickets，行為同 searchFlights。 */
+export function searchTickets(
+  getIdToken: () => Promise<string>,
+  params: TicketSearchParams,
+  fetchImpl: typeof fetch = fetch,
+): Promise<TicketSearchResult> {
+  return callTravelApi<TicketSearchResult>('/api/travel/tickets', getIdToken, params, fetchImpl);
 }
 
 async function callTravelApi<T extends { available: boolean; reason?: string }>(
@@ -189,6 +221,7 @@ export function createTravelBridge(
 
     searchFlights: (params) => searchFlights(getIdToken, params),
     searchHotels: (params) => searchHotels(getIdToken, params),
+    searchTickets: (params) => searchTickets(getIdToken, params),
 
     async listMyTrips() {
       // 只用 ownerUid 篩選、在前端排序，不需要額外建立複合索引。
