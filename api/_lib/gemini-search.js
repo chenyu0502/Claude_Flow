@@ -72,7 +72,7 @@ export function groundingSources(candidate) {
   return out;
 }
 
-async function callModel(target, { apiKey, systemInstruction, prompt, deadline, search = true, temperature }) {
+async function callModel(target, { apiKey, systemInstruction, prompt, deadline, search = true, temperature, perModelTimeoutMs }) {
   const url = `${GEMINI_BASE}/models/${encodeURIComponent(target)}:generateContent`;
   const res = await fetchWithRetry(url, {
     method: 'POST',
@@ -86,7 +86,7 @@ async function callModel(target, { apiKey, systemInstruction, prompt, deadline, 
         ? { temperature: temperature ?? 0.1 }
         : { temperature: temperature ?? 0.9, responseMimeType: 'application/json' },
     }),
-    timeoutMs: PER_MODEL_TIMEOUT_MS,
+    timeoutMs: perModelTimeoutMs ?? PER_MODEL_TIMEOUT_MS,
     retries: 0, // 備援鏈本身就是重試
     deadline,
   });
@@ -112,14 +112,19 @@ async function callModel(target, { apiKey, systemInstruction, prompt, deadline, 
 
 /**
  * 開啟 Google 搜尋，請模型查詢後以 JSON 回覆。
- * @param {{ apiKey: string, model?: string, systemInstruction: string, prompt: string, search?: boolean, temperature?: number }} params
+ * @param {{ apiKey: string, model?: string, models?: string[], systemInstruction: string, prompt: string, search?: boolean, temperature?: number,
+ *           perModelTimeoutMs?: number, deadline?: number }} params
  *   search 預設 true（開啟 Google 搜尋）；false 時不上網、要求模型直接回 JSON。
+ *   models：自訂備援順序（取代預設的 DEFAULT_MODEL + FALLBACK_MODELS，model 仍排第一）。
+ *   perModelTimeoutMs：單一模型最多等多久；不上網時回得快，縮短才能在模型卡住時還有時間換下一個。
+ *   deadline：呼叫端自己的整段截止時間（Date.now() 基準），例如同一個請求裡要重試時共用；會再被 TOTAL_BUDGET_MS 夾住。
  * @returns {Promise<{ data: object, sources: {title:string, uri:string}[], model: string }>}
  */
 export async function searchJson(params) {
-  const primary = params.model || DEFAULT_MODEL;
-  const chain = [primary, ...FALLBACK_MODELS.filter((m) => m !== primary)];
-  const deadline = Date.now() + TOTAL_BUDGET_MS;
+  const base = params.models?.length ? params.models : [DEFAULT_MODEL, ...FALLBACK_MODELS];
+  const primary = params.model || base[0];
+  const chain = [primary, ...base.filter((m) => m !== primary)];
+  const deadline = Math.min(Date.now() + TOTAL_BUDGET_MS, params.deadline ?? Infinity);
   let lastError;
   for (const model of chain) {
     if (deadline - Date.now() <= MIN_MODEL_ATTEMPT_MS) break;

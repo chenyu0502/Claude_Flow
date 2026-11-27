@@ -37,7 +37,7 @@
 
 ## 動畫製作的劇本生成
 
-- **`POST /api/animate/script`**（`api/_lib/animate.js`）：使用者用幾句話描述故事，後端請 Gemini 寫成動畫劇本 JSON（不開 Google 搜尋，`gemini-search.js` 的 `search: false`）。登入驗證、金鑰（`X-Gemini-Key` 優先，否則用網站的 `GEMINI_API_KEY`）與錯誤說明沿用旅遊規劃。
+- **`POST /api/animate/script`**（`api/_lib/animate.js`）：使用者用幾句話描述故事，後端請 Gemini 寫成動畫劇本 JSON（不開 Google 搜尋，`gemini-search.js` 的 `search: false`）。登入驗證、金鑰（`X-Gemini-Key` 優先，否則用網站的 `GEMINI_API_KEY`）與錯誤說明沿用旅遊規劃。模型順序與旅遊規劃不同：不上網時 `gemini-3.7-flash` 常常超過 120 秒不回應，所以依序試 `gemini-3-flash-preview` → `gemini-3.6-flash` → `gemini-3.7-flash`，每個最多等 22 秒，整個請求（含劇本不完整時的重試）共用 52 秒預算；可用 `ANIMATE_GEMINI_MODEL` 指定第一個模型（`GEMINI_MODEL` 只影響旅遊規劃）。
 - **詞彙表有兩份**：提示詞裡的角色、動作、場景、道具清單（`api/_lib/animate.js` 的 `VOCAB`）要和 animation-studio 的 `js/engine/script.js` 一致；網頁端拿到劇本後會再檢查，不認得的換成最接近的並告訴使用者。
 - **介面**：`src/animate-gate.ts` 通過登入檢查後提供 `window.ClaudeFlowAnimate`（`src/animate-api.ts`：`uid`、`writeScript(prompt, { duration, geminiKey })`）。畫面、畫風、配樂與 MP4 匯出全部在 animation-studio，在使用者的瀏覽器裡進行。
 
