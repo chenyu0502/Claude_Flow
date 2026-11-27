@@ -34,9 +34,9 @@ time：day 白天、sunset 黃昏、night 晚上
 weather：none、snow 下雪、rain 下雨、leaves 落葉、petals 花瓣、stars 星星
 mood（決定配樂）：happy 歡樂、playful 俏皮、epic 熱血、calm 溫馨、tense 緊張、sad 感傷
 characters.kind：person 人、cat 貓、dog 狗（最多 5 個）
-characters 其他欄位：id（英文短代號）、name（台灣繁體中文名字）、color（衣服或毛色：red orange yellow green teal blue navy purple pink brown black white gray cream）、size（small、normal、big；小孩用 small）、hair（人才有：short long spiky bun pigtails bald）、hairColor、x（起始位置 0～100，0 是畫面最左）、facing（left、right）
+characters 其他欄位：id（英文短代號）、name（台灣繁體中文名字）、color（衣服或毛色：red orange yellow green teal blue navy purple pink brown black white gray cream）、size（small、normal、big；小孩用 small）、hair（人才有：short long spiky bun pigtails bald）、hairColor、x（起始位置 0～100，0 是畫面最左；-10 是左邊畫面外、110 是右邊畫面外，晚一點才登場的角色放這裡）、facing（left、right）
 actions.do：idle 站著、walk 走到、run 跑到、sneak 躡手躡腳走到、chase 追（to 填對象 id）、flee 逃跑（to 填位置）、jump 跳、wave 揮手、cheer 歡呼、dance 跳舞、talk 說話（text 填台詞）、laugh 大笑、cry 哭、angry 生氣跺腳、surprised 嚇一跳、think 思考、point 指向（target）、sit 坐下、sleep 睡覺、fall 跌倒、spin 轉圈、throw 丟（prop、target）、pickup 撿起（prop）、give 給（prop、target）、eat 吃（prop）、hug 擁抱（target）、look 看向（target）
-actions 欄位：t（開始秒數）、who（角色 id）、do、dur（秒數，可省略）、to（移動類：位置 0～100 或角色、道具的 id）、target（對象角色 id）、prop（道具 id）、text（台詞）
+actions 欄位：t（開始秒數）、who（角色 id）、do、dur（秒數，可省略）、to（移動類：位置 0～100、-10 或 110（走出畫面），或角色、道具的 id）、target（對象角色 id）、prop（道具 id）、text（台詞）
 props.kind：ball 球、snowball 雪球、fish 魚、bone 骨頭、gift 禮物、cake 蛋糕、flower 花、balloon 氣球、star 星星、heart 愛心、book 書、apple 蘋果、icecream 冰淇淋、umbrella 雨傘
 props 欄位：id、kind、x（在地上的位置）或 holder（一開始拿在誰手上）、color
 effects.kind：impact 撞擊、sparkle 閃亮、hearts 愛心、confetti 彩帶、question 問號、exclaim 驚嘆號、zzz 睡覺、sweat 汗滴、smoke 一陣煙；effects 欄位：t、kind、at（角色 id）
@@ -64,7 +64,8 @@ ${VOCAB}
 5. 鏡頭 3～6 個：從 wide 開始，在重要時刻用 medium 或 close 對準角色，最後回到 wide。
 6. 台詞（talk 的 text）每句 14 字以內；字幕 1～2 句，12 字以內；全部用台灣繁體中文。
 7. 使用者要的東西引擎沒有時，用最接近的代替（例如兔子→小狗、老虎→大貓、餐廳→家裡客廳），並在 note 用一句話說明替換了什麼；沒有替換時 note 留空。
-8. title 是 12 字以內的片名。
+8. 故事裡有「出現、找到、回來、離開」時，用畫面外的位置：例如走失的貓一開始放在 110，被找到時才 walk 進來；離開的角色最後 walk 到 -10 或 110。
+9. title 是 12 字以內的片名。
 只回覆一個 JSON 物件，不要其他文字。格式範例：
 ${EXAMPLE}`;
 
