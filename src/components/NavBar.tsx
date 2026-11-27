@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
-import { History, LogOut, Plane, Sofa, TrendingUp, Users } from 'lucide-react';
+import { Clapperboard, History, LogOut, Plane, Sofa, TrendingUp, Users } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import BrandMark from './BrandMark';
 import StyleToggle from './StyleToggle';
@@ -82,6 +82,9 @@ export default function NavBar() {
                 <a href="/stock/" className="nav-link">
                   <NavItem icon={<TrendingUp size={iconSize} aria-hidden="true" />} label="台股分析" />
                 </a>
+                <NavLink to="/studio" className={navClass}>
+                  <NavItem icon={<Clapperboard size={iconSize} aria-hidden="true" />} label="動畫製作" />
+                </NavLink>
                 {isAdmin && (
                   <>
                     <NavLink to="/admin/users" className={navClass}>

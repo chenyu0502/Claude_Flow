@@ -8,6 +8,7 @@
 - 管理員後台（`/admin/users`）：搜尋、篩選、調整角色、停用帳號
 - **登入紀錄與操作日誌**（Firestore `auditLogs`）：登入、登出、註冊、改密碼、綁定／解除登入方式、修改個人資料、管理員調整角色與停用帳號。管理員在 `/admin/logs` 看全部；每個人在個人資料頁看自己最近 10 筆
 - **台股分析（`/stock/`）**、**室內設計（`/interior/`）**、**旅遊規劃（`/travel/`）**：所有登入的使用者都能用，各自在獨立的 repo 開發（見下方「子網站」）
+- **圖片／影片／動畫製作（`/studio`，所有登入的使用者）**：15 種畫風的三兄妹打雪仗動畫，可改名字與字幕，在瀏覽器裡直接匯出 MP4／PNG，不經伺服器、不用 API 金鑰
 - 權限由 Firestore Security Rules 把關（見 `firestore.rules`，規格見 `CONTRACTS.md`）
 
 ## 子網站：台股分析、室內設計與旅遊規劃
@@ -34,6 +35,13 @@
 - **旅遊規劃的餐廳查詢（`POST /api/travel/restaurants`）**：同一套做法，依地區或景點、日期與時間、用餐時段、料理、每人預算、飲食限制與旅伴，查附近的餐廳：料理、交通、每人價位與全體估算、多網站評比、訂位需求與方式、開放訂位時間、營業與公休、招牌菜、親子與飲食限制說明、管道與來源。網站不代為訂位。旅遊規劃頁面透過 `window.ClaudeFlowTravel.searchRestaurants()` 呼叫。
 - **旅遊規劃的使用者金鑰**：使用者可在旅遊規劃頁面輸入自己的 Gemini 金鑰（只存在瀏覽器、依帳號分開）。`TravelBridge` 的各查詢方法接受 `{ geminiKey }`，以 `X-Gemini-Key` 標頭送出，後端優先使用（`flights.js` 的 `resolveKey`）。`POST /api/travel/key-check` 只列出金鑰可用的模型來確認有效，不消耗查詢額度。
 - **旅遊規劃的行程（Firestore `trips/{tripId}`）**：旅遊規劃本身不載入 Firebase。`src/travel-gate.ts` 通過登入檢查後，把 `src/travel-store.ts` 的存取介面以 `window.ClaudeFlowTravel` 提供給它。分享方式是「知道連結就能看」：登入且未停用的使用者可以用 ID 讀單一份行程，但只能列出自己的行程；只有建立者能修改與刪除（規則與測試：`firestore.rules`、`tests/rules/trips.rules.test.ts`）。
+
+## 動畫工作室的架構
+
+- **動畫本身**：`public/animations/<畫風>.html`，每支是一個 `<canvas>` 加程式合成的配樂，由 Claude_Animate 專案的 `/animate` 做出來。用 `node scripts/import-animations.mjs <Claude_Animate 資料夾>` 匯入（同時拍縮圖到 `public/animations/thumbs/`），匯入後的檔案要提交，Vercel 建置時拿不到 Claude_Animate。
+- **可改的文字**：匯入腳本把名字、結尾字幕、大雪球砸下時的字換成 `CFX(鍵, 原字)`，執行時讀網址參數 `?cf=<JSON>`。哪個畫風有哪些欄位寫在 `src/studio/catalog.ts`，匯入時會印出實際找到的欄位，兩邊要一致。
+- **預覽**：`StudioPage` 把動畫放進 iframe（`?export=1` 關掉動畫自己的播放迴圈），由頁面逐格呼叫 `renderFrame(t)`；聲音由 `buildScore()` 算好後用 Web Audio 播放。
+- **匯出**：`src/studio/exporter.ts` 用 WebCodecs 逐格編碼 H.264、配樂編成 AAC（不支援時改 Opus 或只輸出畫面），`mp4-muxer` 封裝成 MP4。一般電腦 1080p 約 30 秒；需要 Chrome、Edge、Safari 16.4+ 或 Firefox 130+。
 
 ## 本地開發（Emulator，不需要真的 Firebase 專案）
 

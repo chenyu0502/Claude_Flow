@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Plane, ShieldCheck, Sofa, TrendingUp, UserRound, Users } from 'lucide-react';
+import { ArrowRight, Clapperboard, Plane, ShieldCheck, Sofa, TrendingUp, UserRound, Users } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { VerifyEmailNotice } from '../auth/guards';
 import { formatTimestamp } from './ProfilePage';
@@ -66,7 +66,7 @@ export default function HomePage() {
           <span className="eyebrow">個人工作台</span>
           <h1>設計、旅行與投資，都在這裡</h1>
           <p className="home-hero-lead">
-            Claude Flow 集合了室內設計、旅遊規劃與台股分析，一個帳號登入，所有工具隨手可用。
+            Claude Flow 集合了室內設計、旅遊規劃、台股分析與動畫製作，一個帳號登入，所有工具隨手可用。
           </p>
           <div className="row home-actions">
             <Link to="/register" className="btn btn-primary">
@@ -153,6 +153,13 @@ export default function HomePage() {
           icon={<TrendingUp size={22} aria-hidden="true" />}
           title="台股分析"
           description="持股、績效、個股分析與 AI 解讀（AI 需使用你自己的 Gemini API Key）。"
+        />
+        <AppCard
+          href="/studio"
+          icon={<Clapperboard size={22} aria-hidden="true" />}
+          title="圖片／影片／動畫製作"
+          description="15 種畫風的三兄妹打雪仗動畫，改成自己的名字和字幕，直接下載 MP4 或圖片。"
+          tag="新"
         />
         {isAdmin && (
           <AppCard

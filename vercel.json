@@ -57,7 +57,7 @@
       "destination": "/travel/index.html"
     },
     {
-      "source": "/((?!api/|assets/|stock/|interior/|travel/|version\\.json$).*)",
+      "source": "/((?!api/|assets/|stock/|interior/|travel/|animations/|version\\.json$).*)",
       "destination": "/index.html"
     }
   ]
