@@ -15,6 +15,20 @@ import { searchJson } from './gemini-search.js';
 export const PROMPT_MAX = 300;
 const DURATIONS = [8, 12, 16];
 
+/**
+ * 寫劇本用的模型順序。不同於旅遊規劃（要上網搜尋）：
+ * 2026-11 實測 gemini-3.7-flash（共用的預設模型）不上網時常常超過 120 秒不回應，
+ * 而 gemini-3-flash-preview 約 8～12 秒、gemini-3.6-flash 約 13～21 秒，所以把快的排前面。
+ * 可用 ANIMATE_GEMINI_MODEL 環境變數指定第一個要試的模型。
+ */
+export const ANIMATE_MODELS = ['gemini-3-flash-preview', 'gemini-3.6-flash', 'gemini-3.7-flash'];
+/** 單一模型最多等 22 秒（實測最慢約 21 秒）：第一個卡住時，還有時間換下一個。 */
+export const ANIMATE_MODEL_TIMEOUT_MS = 22000;
+/** 整個請求（含劇本不完整時的重試）的時間預算，要小於 vercel.json 的 maxDuration（60 秒）。 */
+export const ANIMATE_BUDGET_MS = 52000;
+/** 剩下的時間不夠一個模型正常回應時，就不再重試。 */
+const MIN_RETRY_MS = 10000;
+
 const VOCAB = `scene（場景）：snow 雪地公園、beach 海邊、city 城市街道、forest 森林、park 草地公園、room 家裡客廳
 time：day 白天、sunset 黃昏、night 晚上
 weather：none、snow 下雪、rain 下雨、leaves 落葉、petals 花瓣、stars 星星
@@ -79,20 +93,26 @@ export function looksLikeScript(data) {
  * @param {{ search?: typeof searchJson }} [deps] 測試用
  */
 export async function animateScriptHandler(input, env = {}, ctx = {}, deps = {}) {
-  const { search = searchJson } = deps;
+  const { search = searchJson, now = Date.now } = deps;
   const parsed = parseInput(input);
   if (parsed.error) return { status: 400, body: { error: parsed.error } };
   const key = resolveKey(env, ctx);
   if (!key) return { status: 200, noStore: true, body: { available: false, reason: '網站尚未設定 Gemini 金鑰，請在下方填入你自己的金鑰。' } };
 
   let lastError = null;
+  // 兩次嘗試共用同一個截止時間，整個請求才不會超過 Vercel 的 60 秒上限
+  const deadline = now() + ANIMATE_BUDGET_MS;
   // 偶爾會回不完整的劇本：最多試兩次
   for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt > 0 && deadline - now() < MIN_RETRY_MS) break;
     let result;
     try {
       result = await search({
         apiKey: key.apiKey,
-        model: env.GEMINI_MODEL,
+        model: env.ANIMATE_GEMINI_MODEL,
+        models: ANIMATE_MODELS,
+        perModelTimeoutMs: ANIMATE_MODEL_TIMEOUT_MS,
+        deadline,
         systemInstruction: SYSTEM_INSTRUCTION,
         prompt: buildPrompt(parsed.value),
         search: false,

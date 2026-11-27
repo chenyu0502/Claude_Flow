@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest';
-import { animateScriptHandler, buildPrompt, describeAnimateError, looksLikeScript, parseInput } from './animate.js';
+import { ANIMATE_BUDGET_MS, ANIMATE_MODELS, ANIMATE_MODEL_TIMEOUT_MS, animateScriptHandler, buildPrompt, describeAnimateError, looksLikeScript, parseInput } from './animate.js';
 
 const SCRIPT = { title: '測試', characters: [{ id: 'a', kind: 'cat' }], actions: [{ t: 0, who: 'a', do: 'jump' }], note: '兔子改成小狗' };
 
@@ -45,6 +45,19 @@ describe('animateScriptHandler', () => {
     expect(r.body).toMatchObject({ available: true, note: '兔子改成小狗', model: 'm1' });
     expect(r.body.script.duration).toBe(8);
     expect(r.body.script.note).toBeUndefined();
+  });
+  it('用寫劇本專用的模型順序與單一模型時限，可用 ANIMATE_GEMINI_MODEL 指定第一個', async () => {
+    const search = vi.fn().mockResolvedValue({ data: SCRIPT, model: 'm' });
+    await animateScriptHandler({ prompt: '貓' }, { GEMINI_API_KEY: 'k', GEMINI_MODEL: 'travel-only', ANIMATE_GEMINI_MODEL: 'x' }, {}, { search, now: () => 1000 });
+    expect(search.mock.calls[0][0]).toMatchObject({ model: 'x', models: ANIMATE_MODELS, perModelTimeoutMs: ANIMATE_MODEL_TIMEOUT_MS, deadline: 1000 + ANIMATE_BUDGET_MS });
+    expect(ANIMATE_MODELS[0]).not.toBe('gemini-3.7-flash');
+  });
+  it('重試和第一次共用截止時間，剩下的時間不夠就不重試', async () => {
+    let t = 0;
+    const search = vi.fn(async () => { t += 45000; return { data: { title: 'x' }, model: 'm' }; });
+    const r = await animateScriptHandler({ prompt: '貓' }, { GEMINI_API_KEY: 'k' }, {}, { search, now: () => t });
+    expect(search).toHaveBeenCalledTimes(1);
+    expect(r.body.available).toBe(false);
   });
   it('第一次回不完整的劇本時重試一次', async () => {
     const search = vi.fn().mockResolvedValueOnce({ data: { title: 'x' }, model: 'm' }).mockResolvedValueOnce({ data: SCRIPT, model: 'm' });
