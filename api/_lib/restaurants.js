@@ -6,8 +6,10 @@
  * 金鑰與錯誤說明沿用航班查詢（flights.js），評比格式沿用飯店查詢（hotels.js）。
  */
 
-import { describeError, resolveKey } from './flights.js';
+import { describeError, modelNote, resolveKey } from './flights.js';
 import { searchJson } from './gemini-search.js';
+
+const withModel = (r, result) => ({ ...r, note: modelNote(r.note, result) });
 import { normalizeRatings } from './hotels.js';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -157,9 +159,10 @@ export async function restaurantsHandler(input, env = {}, ctx = {}, deps = {}) {
     body: {
       available: true,
       area: v.area, date: v.date, time: v.time, meal: v.meal,
-      ...normalizeResult(result.data),
+      ...withModel(normalizeResult(result.data), result),
       sources: result.sources ?? [],
       model: result.model,
+      ...(result.fallbackFrom ? { fallbackFrom: result.fallbackFrom } : {}),
       fetchedAt: now().toISOString().slice(0, 10),
     },
   };

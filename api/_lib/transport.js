@@ -6,8 +6,10 @@
  * 網站不代售票券；金鑰與錯誤說明沿用航班查詢（flights.js）。
  */
 
-import { describeError, resolveKey } from './flights.js';
+import { describeError, modelNote, resolveKey } from './flights.js';
 import { searchJson } from './gemini-search.js';
+
+const withModel = (r, result) => ({ ...r, note: modelNote(r.note, result) });
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const URL_RE = /^https?:\/\/[^\s"'<>]+$/i;
@@ -154,9 +156,10 @@ export async function transportHandler(input, env = {}, ctx = {}, deps = {}) {
     noStore: true,
     body: {
       available: true,
-      ...normalizeResult(result.data),
+      ...withModel(normalizeResult(result.data), result),
       sources: result.sources ?? [],
       model: result.model,
+      ...(result.fallbackFrom ? { fallbackFrom: result.fallbackFrom } : {}),
       fetchedAt: now().toISOString().slice(0, 10),
     },
   };
