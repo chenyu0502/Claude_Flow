@@ -7,6 +7,7 @@
  * - 一併回傳 groundingMetadata 中實際查過的網頁（sources），讓使用者能核對。
  */
 
+import { createHash } from 'node:crypto';
 import { fetchWithRetry } from './http.js';
 
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
@@ -29,6 +30,81 @@ export const isQuotaExhausted = (m) => /429|quota|RESOURCE_EXHAUSTED/i.test(m);
 const isTransient = (m) => /abort|timeout|逾時|50[023]|overload|UNAVAILABLE/i.test(m);
 /** 這把金鑰（或這個方案）不能使用搜尋功能 */
 export const isSearchNotAllowed = (m) => /google_search|grounding|search.*not (supported|enabled|available)|billing/i.test(m);
+
+/* ---------- 額度用完時自動換模型 ---------- */
+
+/** 備援鏈最多試幾個模型（每個配額用盡的回應約 1 秒，時間預算仍以 TOTAL_BUDGET_MS 為準） */
+export const MAX_CHAIN = 10;
+/** 模型清單快取多久；額度用完的模型多久內先不試（排到最後） */
+const LIST_TTL_MS = 6 * 60 * 60 * 1000;
+const EXHAUSTED_LONG_MS = 60 * 60 * 1000;
+const EXHAUSTED_SHORT_MS = 2 * 60 * 1000;
+
+/** 函式實例存活期間的記憶（以金鑰雜湊區分，不保存金鑰本身） */
+const modelCache = new Map(); // keyId -> { at, models }
+const exhausted = new Map(); // keyId -> Map(model -> until)
+const keyId = (apiKey) => createHash('sha256').update(String(apiKey)).digest('hex').slice(0, 16);
+
+/** 測試用：清除記憶 */
+export function resetModelMemory() {
+  modelCache.clear();
+  exhausted.clear();
+}
+
+/** 只留適合查詢的 Gemini 文字模型（排除語音、圖片、嵌入、即時等專用模型） */
+export function usableModel(name) {
+  return /^gemini-/.test(name) && /flash|pro/.test(name)
+    && !/tts|image|live|audio|embed|vision|computer|robotics|native|thinking|exp(-|$)/.test(name);
+}
+
+/** 排序：版本新的先；同版本 flash → flash-lite → pro（pro 慢且免費額度少，放最後） */
+export function rankModels(names) {
+  const ver = (n) => Number((n.match(/^gemini-(\d+(?:\.\d+)?)/) ?? [])[1] ?? 0);
+  const tier = (n) => (/flash-lite/.test(n) ? 1 : /flash/.test(n) ? 0 : 2);
+  return [...names].sort((a, b) => tier(a) === 2 || tier(b) === 2 ? tier(a) - tier(b) || ver(b) - ver(a)
+    : ver(b) - ver(a) || tier(a) - tier(b) || a.length - b.length);
+}
+
+/** 列出這把金鑰可用的模型（快取；失敗時回空陣列，不影響查詢） */
+async function discoverModels(apiKey, deadline) {
+  const id = keyId(apiKey);
+  const hit = modelCache.get(id);
+  if (hit && Date.now() - hit.at < LIST_TTL_MS) return hit.models;
+  let models = [];
+  try {
+    const res = await fetchWithRetry(`${GEMINI_BASE}/models?pageSize=200`, {
+      headers: { 'x-goog-api-key': apiKey }, timeoutMs: 5000, retries: 0, deadline,
+    });
+    if (res.ok) {
+      const json = await res.json();
+      models = rankModels((json?.models ?? [])
+        .filter((m) => (m.supportedGenerationMethods ?? []).includes('generateContent'))
+        .map((m) => String(m.name ?? '').replace(/^models\//, ''))
+        .filter(usableModel));
+    }
+  } catch {
+    /* 列不出來就只用預設的備援鏈 */
+  }
+  if (models.length) modelCache.set(id, { at: Date.now(), models });
+  return models;
+}
+
+function markExhausted(apiKey, model, message) {
+  const id = keyId(apiKey);
+  if (!exhausted.has(id)) exhausted.set(id, new Map());
+  // 每分鐘的限制很快恢復；每日額度用完則一小時內先不試
+  const short = /per ?minute|PerMinute|retry in \d{1,2}(\.\d+)?s/i.test(message) && !/per ?day|PerDay/i.test(message);
+  exhausted.get(id).set(model, Date.now() + (short ? EXHAUSTED_SHORT_MS : EXHAUSTED_LONG_MS));
+}
+
+/** 最近額度用完的模型移到最後（仍保留，萬一其他都不行還能再試） */
+function deprioritize(apiKey, chain) {
+  const m = exhausted.get(keyId(apiKey));
+  if (!m) return chain;
+  const now = Date.now();
+  const tired = (x) => (m.get(x) ?? 0) > now;
+  return [...chain.filter((x) => !tired(x)), ...chain.filter(tired)];
+}
 
 /**
  * 從模型的文字回覆取出 JSON 物件：優先取最後一個 ```json 區塊，否則取第一個 { 到最後一個 }。
@@ -117,26 +193,40 @@ async function callModel(target, { apiKey, systemInstruction, prompt, deadline, 
  *   search 預設 true（開啟 Google 搜尋）；false 時不上網、要求模型直接回 JSON。
  *   models：自訂備援順序（取代預設的 DEFAULT_MODEL + FALLBACK_MODELS，model 仍排第一）。
  *   perModelTimeoutMs：單一模型最多等多久；不上網時回得快，縮短才能在模型卡住時還有時間換下一個。
+ *   discover：預設 true；未指定 models 時，先列出這把金鑰可用的模型接在預設備援鏈後面。
  *   deadline：呼叫端自己的整段截止時間（Date.now() 基準），例如同一個請求裡要重試時共用；會再被 TOTAL_BUDGET_MS 夾住。
- * @returns {Promise<{ data: object, sources: {title:string, uri:string}[], model: string }>}
+ * @returns {Promise<{ data: object, sources: {title:string, uri:string}[], model: string, fallbackFrom?: string }>}
+ *   fallbackFrom：前面的模型失敗（例如額度用完）而改用其他模型時，記下原本的第一個模型。
  */
 export async function searchJson(params) {
-  const base = params.models?.length ? params.models : [DEFAULT_MODEL, ...FALLBACK_MODELS];
+  const custom = !!params.models?.length;
+  const base = custom ? params.models : [DEFAULT_MODEL, ...FALLBACK_MODELS];
   const primary = params.model || base[0];
-  const chain = [primary, ...base.filter((m) => m !== primary)];
   const deadline = Math.min(Date.now() + TOTAL_BUDGET_MS, params.deadline ?? Infinity);
+  let chain = [primary, ...base.filter((m) => m !== primary)];
+  // 預設備援鏈之後，再接上這把金鑰實際可用的其他模型（新模型上線、舊模型退役都能跟上）
+  if (!custom && params.discover !== false) {
+    const extra = await discoverModels(params.apiKey, deadline);
+    chain = [...chain, ...extra.filter((m) => !chain.includes(m))];
+  }
+  chain = deprioritize(params.apiKey, chain).slice(0, MAX_CHAIN);
   let lastError;
+  const tried = [];
   for (const model of chain) {
     if (deadline - Date.now() <= MIN_MODEL_ATTEMPT_MS) break;
+    tried.push(model);
     try {
-      return { ...(await callModel(model, { ...params, deadline })), model };
+      return { ...(await callModel(model, { ...params, deadline })), model, ...(tried.length > 1 ? { fallbackFrom: tried[0] } : {}) };
     } catch (err) {
       lastError = err;
       if (isLocationBlocked(err.message)) throw err;
+      if (isQuotaExhausted(err.message)) markExhausted(params.apiKey, model, err.message);
       const worthRetrying =
         isModelUnavailable(err.message) || isQuotaExhausted(err.message) || isTransient(err.message);
       if (!worthRetrying) throw err;
     }
   }
-  throw lastError ?? new Error('已逾時，來不及送出請求');
+  const err = lastError ?? new Error('已逾時，來不及送出請求');
+  err.triedModels = tried;
+  throw err;
 }

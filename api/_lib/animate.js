@@ -138,5 +138,5 @@ export async function animateScriptHandler(input, env = {}, ctx = {}, deps = {})
 export function describeAnimateError(err, keySource) {
   const msg = String(err?.message ?? '');
   if (/劇本格式不完整|JSON/i.test(msg)) return 'AI 寫的劇本不完整，請再按一次「生成動畫」，或把故事寫得具體一點。';
-  return describeError(err, keySource).replace(/，或按「改用 claude\.ai 查詢」。?/, '。').replace(/請按「改用 claude\.ai 查詢」。?/, '請稍後再試。');
+  return describeError(err, keySource).replace(/，也可以到「設定 → Gemini 金鑰」[^，。]*/, '').replace(/，或按「改用 claude\.ai 查詢」。?/, '。').replace(/請按「改用 claude\.ai 查詢」。?/, '請稍後再試。');
 }

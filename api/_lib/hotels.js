@@ -5,8 +5,10 @@
  * 整理成固定格式回傳給網頁。金鑰與錯誤說明沿用航班查詢（flights.js）。
  */
 
-import { describeError, resolveKey } from './flights.js';
+import { describeError, modelNote, resolveKey } from './flights.js';
 import { searchJson } from './gemini-search.js';
+
+const withModel = (r, result) => ({ ...r, note: modelNote(r.note, result) });
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_HOTELS = 12;
@@ -165,9 +167,10 @@ export async function hotelsHandler(input, env = {}, ctx = {}, deps = {}) {
       area: v.area,
       checkIn: v.checkIn,
       checkOut: v.checkOut,
-      ...normalizeResult(result.data),
+      ...withModel(normalizeResult(result.data), result),
       sources: result.sources ?? [],
       model: result.model,
+      ...(result.fallbackFrom ? { fallbackFrom: result.fallbackFrom } : {}),
       fetchedAt: now().toISOString().slice(0, 10),
     },
   };

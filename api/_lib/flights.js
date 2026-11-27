@@ -95,11 +95,25 @@ export function resolveKey(env, ctx) {
 }
 
 /** 把上游錯誤翻譯成使用者看得懂、知道下一步怎麼做的說明。 */
+/** 改用備援模型時，在結果說明後面註記（網頁會顯示 note） */
+export function modelNote(note, result) {
+  if (!result?.fallbackFrom) return note ?? '';
+  const add = `（${result.fallbackFrom} 額度用完或暫時無法使用，本次自動改用 ${result.model} 查詢）`;
+  return note ? `${add} ${note}` : add;
+}
+
+const withModel = (r, result) => ({ ...r, note: modelNote(r.note, result) });
+
 export function describeError(err, keySource) {
   const m = String(err?.message ?? '');
   const whose = keySource === 'user' ? '你的 Gemini 金鑰' : '網站的 Gemini 金鑰';
   if (isLocationBlocked(m)) return 'Gemini 不服務伺服器所在的地區，請管理員確認 Vercel 函式的區域設定。';
-  if (isQuotaExhausted(m)) return `${whose}今日的免費查詢額度已用完，請明天再試，或按「改用 claude.ai 查詢」。`;
+  if (isQuotaExhausted(m)) {
+    const n = err?.triedModels?.length ?? 0;
+    const tried = n > 1 ? `已自動改試 ${n} 個模型，` : '';
+    const hint = keySource === 'user' ? '，也可以到「設定 → Gemini 金鑰」清除改用網站共用金鑰' : '，也可以到「設定 → Gemini 金鑰」改用自己的金鑰';
+    return `${whose}${tried}免費查詢額度已用完。請稍後再試${hint}，或按「改用 claude.ai 查詢」。`;
+  }
   if (/api key not valid|API_KEY_INVALID|permission|401|403/i.test(m)) return `${whose}無效或沒有權限，請管理員確認設定。`;
   if (isSearchNotAllowed(m)) return `${whose}的方案不能使用 Google 搜尋，請按「改用 claude.ai 查詢」。`;
   if (/JSON/i.test(m)) return '查詢結果格式不完整，請再試一次。';
@@ -141,9 +155,10 @@ export async function flightsHandler(input, env = {}, ctx = {}, deps = {}) {
     body: {
       available: true,
       airline: parsed.value.airline,
-      ...normalizeResult(result.data),
+      ...withModel(normalizeResult(result.data), result),
       sources: result.sources ?? [],
       model: result.model,
+      ...(result.fallbackFrom ? { fallbackFrom: result.fallbackFrom } : {}),
       fetchedAt: now().toISOString().slice(0, 10),
     },
   };
