@@ -72,7 +72,7 @@ export function groundingSources(candidate) {
   return out;
 }
 
-async function callModel(target, { apiKey, systemInstruction, prompt, deadline }) {
+async function callModel(target, { apiKey, systemInstruction, prompt, deadline, search = true, temperature }) {
   const url = `${GEMINI_BASE}/models/${encodeURIComponent(target)}:generateContent`;
   const res = await fetchWithRetry(url, {
     method: 'POST',
@@ -80,8 +80,11 @@ async function callModel(target, { apiKey, systemInstruction, prompt, deadline }
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: systemInstruction }] },
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      tools: [{ google_search: {} }],
-      generationConfig: { temperature: 0.1 },
+      // search: false 時不上網（例如動畫製作寫劇本），直接要求模型回 JSON
+      ...(search ? { tools: [{ google_search: {} }] } : {}),
+      generationConfig: search
+        ? { temperature: temperature ?? 0.1 }
+        : { temperature: temperature ?? 0.9, responseMimeType: 'application/json' },
     }),
     timeoutMs: PER_MODEL_TIMEOUT_MS,
     retries: 0, // 備援鏈本身就是重試
@@ -109,7 +112,8 @@ async function callModel(target, { apiKey, systemInstruction, prompt, deadline }
 
 /**
  * 開啟 Google 搜尋，請模型查詢後以 JSON 回覆。
- * @param {{ apiKey: string, model?: string, systemInstruction: string, prompt: string }} params
+ * @param {{ apiKey: string, model?: string, systemInstruction: string, prompt: string, search?: boolean, temperature?: number }} params
+ *   search 預設 true（開啟 Google 搜尋）；false 時不上網、要求模型直接回 JSON。
  * @returns {Promise<{ data: object, sources: {title:string, uri:string}[], model: string }>}
  */
 export async function searchJson(params) {

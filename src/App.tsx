@@ -7,7 +7,6 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import ProfilePage from './pages/ProfilePage';
-import StudioPage from './pages/StudioPage';
 import AdminUsersPage from './pages/admin/AdminUsersPage';
 import AdminLogsPage from './pages/admin/AdminLogsPage';
 import NotFoundPage from './pages/NotFoundPage';
@@ -22,7 +21,6 @@ export default function App() {
             <Route path="login" element={<LoginPage />} />
             <Route path="register" element={<RegisterPage />} />
             <Route path="reset-password" element={<ResetPasswordPage />} />
-            <Route path="studio" element={<RequireAuth><StudioPage /></RequireAuth>} />
             <Route path="profile" element={<RequireAuth><ProfilePage /></RequireAuth>} />
             <Route path="admin/users" element={<RequireAdmin><AdminUsersPage /></RequireAdmin>} />
             <Route path="admin/logs" element={<RequireAdmin><AdminLogsPage /></RequireAdmin>} />

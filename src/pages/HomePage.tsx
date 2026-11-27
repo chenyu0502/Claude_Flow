@@ -155,10 +155,11 @@ export default function HomePage() {
           description="持股、績效、個股分析與 AI 解讀（AI 需使用你自己的 Gemini API Key）。"
         />
         <AppCard
-          href="/studio"
+          href="/animate/"
+          external
           icon={<Clapperboard size={22} aria-hidden="true" />}
           title="圖片／影片／動畫製作"
-          description="15 種畫風的三兄妹打雪仗動畫，改成自己的名字和字幕，直接下載 MP4 或圖片。"
+          description="說幾句話，AI 寫劇本、程式畫出動畫；可切換畫風，下載 MP4 或圖片（AI 可用你自己的 Gemini 金鑰）。"
           tag="新"
         />
         {isAdmin && (

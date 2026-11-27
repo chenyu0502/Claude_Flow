@@ -10,7 +10,7 @@
   },
   "headers": [
     {
-      "source": "/assets/((?!interior-gate\\.js$)(?!travel-gate\\.js$).*)",
+      "source": "/assets/((?!interior-gate\\.js$)(?!travel-gate\\.js$)(?!animate-gate\\.js$).*)",
       "headers": [
         {
           "key": "Cache-Control",
@@ -29,6 +29,16 @@
       "source": "/travel",
       "destination": "/travel/",
       "permanent": false
+    },
+    {
+      "source": "/animate",
+      "destination": "/animate/",
+      "permanent": false
+    },
+    {
+      "source": "/studio",
+      "destination": "/animate/",
+      "permanent": false
     }
   ],
   "rewrites": [
@@ -45,7 +55,7 @@
       "destination": "https://tw-stock-analysis.vercel.app/stock/:path+"
     },
     {
-      "source": "/api/:path((?!travel/).*)",
+      "source": "/api/:path((?!travel/|animate/).*)",
       "destination": "https://tw-stock-analysis.vercel.app/api/:path"
     },
     {
@@ -57,7 +67,11 @@
       "destination": "/travel/index.html"
     },
     {
-      "source": "/((?!api/|assets/|stock/|interior/|travel/|animations/|version\\.json$).*)",
+      "source": "/animate/",
+      "destination": "/animate/index.html"
+    },
+    {
+      "source": "/((?!api/|assets/|stock/|interior/|travel/|animate/|version\\.json$).*)",
       "destination": "/index.html"
     }
   ]

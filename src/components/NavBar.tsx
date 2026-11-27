@@ -82,9 +82,9 @@ export default function NavBar() {
                 <a href="/stock/" className="nav-link">
                   <NavItem icon={<TrendingUp size={iconSize} aria-hidden="true" />} label="台股分析" />
                 </a>
-                <NavLink to="/studio" className={navClass}>
+                <a href="/animate/" className="nav-link">
                   <NavItem icon={<Clapperboard size={iconSize} aria-hidden="true" />} label="動畫製作" />
-                </NavLink>
+                </a>
                 {isAdmin && (
                   <>
                     <NavLink to="/admin/users" className={navClass}>

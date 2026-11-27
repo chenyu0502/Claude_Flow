@@ -6,7 +6,7 @@ import type { Plugin } from 'vite';
 import versionPlugin, { resolveBuildId } from './vite-plugin-version';
 
 /** 由 Claude Flow 一起發布的靜態子網站（public/<名稱>/），建置時由 scripts/fetch-*.mjs 抓取 */
-const STATIC_SUBSITES = ['interior', 'travel'];
+const STATIC_SUBSITES = ['interior', 'travel', 'animate'];
 /** 各子網站的登入檢查入口（src/<名稱>-gate.ts），建置後輸出為固定檔名 assets/<名稱>-gate.js */
 const GATE_ENTRIES = STATIC_SUBSITES.map((name) => `${name}-gate`);
 
@@ -42,7 +42,7 @@ function subsiteDevIndex(): Plugin {
 }
 
 /**
- * 開發伺服器上的旅遊規劃 API（/api/travel/*）。
+ * 開發伺服器上的旅遊規劃與動畫製作 API（/api/travel/*、/api/animate/*）。
  *
  * 正式環境由 Vercel 把 api/travel/*.js 部署成 serverless function；本機 vite dev 沒有這層，
  * 這裡用 ssrLoadModule 載入同一個檔案，並補上 Vercel 的 req.body、res.status().json() 介面，
@@ -57,14 +57,14 @@ function travelApiDev(env: Record<string, string>): Plugin {
       for (const [k, v] of Object.entries(env)) if (process.env[k] === undefined) process.env[k] = v;
       server.middlewares.use(async (req, res, next) => {
         const path = (req.url ?? '').split('?')[0];
-        const m = /^\/api\/travel\/([a-z-]+)$/.exec(path);
+        const m = /^\/api\/(travel|animate)\/([a-z-]+)$/.exec(path);
         if (!m) return next();
         try {
           const chunks: Buffer[] = [];
           for await (const c of req) chunks.push(c as Buffer);
           const raw = Buffer.concat(chunks).toString('utf8');
           const body = raw ? JSON.parse(raw) : {};
-          const mod = await server.ssrLoadModule(`/api/travel/${m[1]}.js`);
+          const mod = await server.ssrLoadModule(`/api/${m[1]}/${m[2]}.js`);
           const shim = Object.assign(res, {
             status(code: number) { res.statusCode = code; return shim; },
             json(data: unknown) { res.setHeader('Content-Type', 'application/json; charset=utf-8'); res.end(JSON.stringify(data)); },
@@ -95,8 +95,8 @@ export default defineConfig(({ mode }) => {
       port: 5173,
       proxy: {
         '/stock': { target: stockDevUrl, changeOrigin: true, ws: true },
-        // /api/travel/* 由上面的 travelApiDev 在本機處理，其餘轉送到台股
-        '^/api/(?!travel/)': { target: stockDevUrl, changeOrigin: true },
+        // /api/travel/*、/api/animate/* 由上面的 travelApiDev 在本機處理，其餘轉送到台股
+        '^/api/(?!travel/|animate/)': { target: stockDevUrl, changeOrigin: true },
       },
     },
     build: {

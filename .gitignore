@@ -12,6 +12,8 @@ ui-debug.log
 public/interior
 # 旅遊規劃師：同上，由 scripts/fetch-travel.mjs 從 chenyu0502/travel-planner 抓取
 public/travel
+# 動畫製作：同上，由 scripts/fetch-animate.mjs 從 chenyu0502/animation-studio 抓取
+public/animate
 
 .vercel
 .env*
