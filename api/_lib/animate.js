@@ -34,7 +34,7 @@ time：day 白天、sunset 黃昏、night 晚上
 weather：none、snow 下雪、rain 下雨、leaves 落葉、petals 花瓣、stars 星星
 mood（決定配樂）：happy 歡樂、playful 俏皮、epic 熱血、calm 溫馨、tense 緊張、sad 感傷
 characters.kind：person 人、cat 貓、dog 狗（最多 5 個）
-characters 其他欄位：id（英文短代號）、name（台灣繁體中文名字）、color（衣服或毛色：red orange yellow green teal blue navy purple pink brown black white gray cream）、size（small、normal、big；小孩用 small）、hair（人才有：short long spiky bun pigtails bald）、hairColor、x（起始位置 0～100，0 是畫面最左；-10 是左邊畫面外、110 是右邊畫面外，晚一點才登場的角色放這裡）、facing（left、right）
+characters 其他欄位：id（英文短代號）、name（台灣繁體中文名字）、color（衣服或毛色：red orange yellow green teal blue navy purple pink brown black white gray cream）、size（small、normal、big；小孩用 small）、hair（人才有：short long spiky bun pigtails bald）、hairColor、voice（配音：boy 小男孩、girl 小女孩、man 男人、woman 女人、old-man 爺爺、old-woman 奶奶；貓狗填 cat、dog）、x（起始位置 0～100，0 是畫面最左；-10 是左邊畫面外、110 是右邊畫面外，晚一點才登場的角色放這裡）、facing（left、right）
 actions.do：idle 站著、walk 走到、run 跑到、sneak 躡手躡腳走到、chase 追（to 填對象 id）、flee 逃跑（to 填位置）、jump 跳、wave 揮手、cheer 歡呼、dance 跳舞、talk 說話（text 填台詞）、laugh 大笑、cry 哭、angry 生氣跺腳、surprised 嚇一跳、think 思考、point 指向（target）、sit 坐下、sleep 睡覺、fall 跌倒、spin 轉圈、throw 丟（prop、target）、pickup 撿起（prop）、give 給（prop、target）、eat 吃（prop）、hug 擁抱（target）、look 看向（target）
 actions 欄位：t（開始秒數）、who（角色 id）、do、dur（秒數，可省略）、to（移動類：位置 0～100、-10 或 110（走出畫面），或角色、道具的 id）、target（對象角色 id）、prop（道具 id）、text（台詞）
 props.kind：ball 球、snowball 雪球、fish 魚、bone 骨頭、gift 禮物、cake 蛋糕、flower 花、balloon 氣球、star 星星、heart 愛心、book 書、apple 蘋果、icecream 冰淇淋、umbrella 雨傘
@@ -44,7 +44,7 @@ camera.shot：wide 全景、medium 中景、close 特寫；camera 欄位：t、s
 captions 欄位：t、dur、text（台灣繁體中文，12 字以內）、pos（top、bottom、center）`;
 
 const EXAMPLE = `{"title":"公園的球","duration":10,"mood":"happy","scene":"park","time":"sunset","weather":"none",
-"characters":[{"id":"kid","kind":"person","name":"小明","color":"green","size":"small","hair":"short","x":20,"facing":"right"},{"id":"dog","kind":"dog","name":"旺財","color":"brown","x":32,"facing":"right"}],
+"characters":[{"id":"kid","kind":"person","name":"小明","voice":"boy","color":"green","size":"small","hair":"short","x":20,"facing":"right"},{"id":"dog","kind":"dog","name":"旺財","voice":"dog","color":"brown","x":32,"facing":"right"}],
 "props":[{"id":"ball","kind":"ball","holder":"kid"}],
 "actions":[{"t":0.5,"who":"kid","do":"talk","text":"旺財，去撿！","dur":1.4},{"t":2.0,"who":"kid","do":"throw","prop":"ball"},{"t":2.6,"who":"dog","do":"run","to":"ball","dur":1.3},{"t":4.0,"who":"dog","do":"pickup","prop":"ball"},{"t":4.9,"who":"dog","do":"run","to":"kid","dur":1.3},{"t":6.4,"who":"dog","do":"give","prop":"ball","target":"kid"},{"t":7.8,"who":"kid","do":"laugh","dur":1.2},{"t":7.8,"who":"dog","do":"jump"},{"t":8.7,"who":"dog","do":"dance","dur":1.3}],
 "camera":[{"t":0,"shot":"medium","on":"kid"},{"t":2.5,"shot":"wide"},{"t":4.8,"shot":"medium","on":"dog"},{"t":7.6,"shot":"wide"}],

@@ -29,3 +29,23 @@ describe('writeScript', () => {
     expect(createAnimateBridge('u1', async () => 't').uid).toBe('u1');
   });
 });
+
+describe('speak', () => {
+  it('帶登入憑證、金鑰與台詞呼叫 /api/animate/voice', async () => {
+    const { speak } = await import('./animate-api');
+    const fetchImpl = vi.fn().mockResolvedValue(new Response(JSON.stringify({ available: true, clips: [{ sampleRate: 24000, pcm: 'AAA=' }] }), { status: 200 }));
+    const lines = [{ text: '汪！', speaker: '旺財', voice: 'dog' }];
+    const r = await speak(async () => 'tok', lines, { mood: 'happy', geminiKey: 'mine' }, fetchImpl);
+    expect(fetchImpl.mock.calls[0][0]).toBe('/api/animate/voice');
+    const init = fetchImpl.mock.calls[0][1];
+    expect(init.headers).toMatchObject({ Authorization: 'Bearer tok', 'X-Gemini-Key': 'mine' });
+    expect(JSON.parse(init.body)).toEqual({ lines, mood: 'happy' });
+    expect(r.available).toBe(true);
+  });
+  it('HTTP 錯誤回 available: false 與說明', async () => {
+    const { speak } = await import('./animate-api');
+    const r = await speak(async () => 'tok', [], {}, vi.fn().mockResolvedValue(new Response('x', { status: 504 })));
+    expect(r).toMatchObject({ available: false });
+    expect(r.reason).toMatch(/配音失敗.*504/);
+  });
+});
